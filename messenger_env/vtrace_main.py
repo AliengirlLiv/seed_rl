@@ -29,7 +29,8 @@ from absl import flags
 
 import os
 from seed_rl.agents.vtrace import learner
-from seed_rl.agents.vtrace import networks
+# from seed_rl.agents.vtrace import networks
+from seed_rl.dmlab import networks
 from seed_rl.common import actor
 from seed_rl.common import common_flags  
 from seed_rl.common import normalizer
@@ -44,7 +45,7 @@ flags.DEFINE_integer('n_mlp_layers', 2, 'Number of MLP hidden layers.')
 flags.DEFINE_integer('mlp_size', 64, 'Sizes of each of MLP hidden layer.')
 flags.DEFINE_integer(
     'n_lstm_layers', 0,
-    'Number of LSTM layers. LSTM layers afre applied after MLP layers.')
+    'Number of LSTM layers. LSTM layers are applied after MLP layers.')
 flags.DEFINE_integer('lstm_size', 64, 'Sizes of each LSTM layer.')
 flags.DEFINE_bool('normalize_observations', False, 'Whether to normalize'
                   'observations by subtracting mean and dividing by stddev.')
@@ -55,16 +56,20 @@ flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
 FLAGS = flags.FLAGS
 
 
-def create_agent(unused_action_space, unused_env_observation_space,
-                 parametric_action_distribution):
-  policy = networks.MLPandLSTM(
-      parametric_action_distribution,
-      mlp_sizes=[FLAGS.mlp_size] * FLAGS.n_mlp_layers,
-      lstm_sizes=[FLAGS.lstm_size] * FLAGS.n_lstm_layers)
-  if FLAGS.normalize_observations:
-    policy = normalizer.NormalizeObservationsWrapper(policy,
-                                                     normalizer.Normalizer())
-  return policy
+# def create_agent(unused_action_space, unused_env_observation_space,
+#                  parametric_action_distribution):
+#   policy = networks.MLPandLSTM(
+#       parametric_action_distribution,
+#       mlp_sizes=[FLAGS.mlp_size] * FLAGS.n_mlp_layers,
+#       lstm_sizes=[FLAGS.lstm_size] * FLAGS.n_lstm_layers)
+#   if FLAGS.normalize_observations:
+#     policy = normalizer.NormalizeObservationsWrapper(policy,
+#                                                      normalizer.Normalizer())
+#   return policy
+
+def create_agent(action_space, unused_env_observation_space,
+                 unused_parametric_action_distribution):
+  return networks.ImpalaDeep(action_space.n)
 
 
 def create_optimizer(unused_final_iteration):

@@ -37,13 +37,15 @@ ENV PATH /opt/conda/bin:$PATH
 RUN conda create -n embodied python=3.8
 SHELL ["conda", "run", "-n", "embodied", "/bin/bash", "-c"]
 
-# Copy SEED codebase and SEED GRPC binaries.
-COPY seed_rl/ /seed_rl/
-COPY messenger-emma/ /messenger-emma/
-RUN cd messenger-emma; pip3 install -e .
 RUN pip3 install cmake absl-py gym==0.21.0
 RUN pip3 install google protobuf==3.20 tensorflow==2.4.1
 
 RUN pip3 install Cython cffi lockfile glfw imageio dataclasses gin-config
 RUN pip3 install tensorflow_probability==0.11.0
+
+# Copy SEED codebase and env
+COPY seed_rl/ /seed_rl/
+COPY messenger-emma/ /messenger-emma/
+RUN cd messenger-emma; pip3 install -e .
+
 WORKDIR /seed_rl

@@ -148,7 +148,6 @@ class Messenger(embodied.Env):
     new_ob = np.maximum.reduce([np.eye(self.n_entities)[layers[..., i]] for i
                                 in range(layers.shape[-1])])
     new_ob[:, :, 0] = 0
-    new_ob = new_ob.mean(axis=1).mean(axis=0)
     assert new_ob.shape == self.observation_space.shape, f'NEW OB: {new_ob.shape}; EXPECTED OB: {self.observation_space.shape}'
     # assert new_ob.shape == self.observation_space["image"].shape
     return new_ob
@@ -158,9 +157,7 @@ class Messenger(embodied.Env):
       return spaces.Box(
         low=0,
         high=1,
-        shape=(self.n_entities,),
-        # shape=(*self.grid_size, self.n_entities),
-        # shape=(9,9,self.n_entities),
+        shape=(*self.grid_size, self.n_entities),
       )
     # obs_space = {
     #   "image": spaces.Box(
@@ -305,9 +302,9 @@ class Messenger(embodied.Env):
     del obs["entities"]
     del obs["avatar"]
     self._init_obs = obs
-    return obs['image']#.mean(axis=1).mean(axis=0)
-    # return obs['image'][:9,:9]
+    o = obs['image'].astype(np.float32)
     # return obs
+    return o
 
   def step(self, action):
     if self.reading:
@@ -337,8 +334,7 @@ class Messenger(embodied.Env):
       elif self.read_step >= len(self.tokens):
         self.reading = False
         self.read_step = 0
-      return obs['image'].mean(axis=1).mean(axis=0), 0, False, {}
-      # return obs['image'][:9,:9], 0, False, {}
+      return obs['image'].astype(np.float32), 0, False, None
 
     self._step += 1 # don't increment step while reading
     obs, rew, done, info = self._env.step(action)
@@ -374,8 +370,8 @@ class Messenger(embodied.Env):
       done = True
       rew = -1
     # return obs['image'][:9, :9], rew, done, info
-    return obs['image'].mean(axis=0), rew, done, info
-    # return obs['image'].mean(axis=1).mean(axis=0), rew, done, info
+    o = obs['image'].astype(np.float32)
+    return o, rew, done, None
     # return obs, rew, done, info
 
   def make_image(self, img, ac, rew, done):

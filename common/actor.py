@@ -105,7 +105,11 @@ def actor_loop(create_env_fn, config=None, log_period=1):
           env_output = utils.EnvOutput(reward, done, observation,
                                        abandoned, episode_step)
           with elapsed_inference_s_timer:
-            action = client.inference(env_id, run_id, env_output, raw_reward)
+            try:
+              action = client.inference(env_id, run_id, env_output, raw_reward)
+            except:
+              print('FAILED ACTION', reward.dtype, done.dtype, observation.dtype, abandoned.dtype, episode_step.dtype)
+              import pdb; pdb.set_trace()
           with timer_cls('actor/elapsed_env_step_s', 1000):
             observation, reward, done, info = batched_env.step(action.numpy())
           if is_rendering_enabled:
