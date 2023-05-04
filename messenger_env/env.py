@@ -66,8 +66,6 @@ class Messenger(embodied.Env):
 
     if task == "s1":
       mmode = "train" if mode == "train" else "val"
-#      self._env = gym.make(f"msgr-{mmode}-v1", disable_env_checker=True)
-#      self._env = gym.make(f"msgr-{mmode}-v1")
       if mode == "train":
         self._env = TwoEnvWrapper(
           stage=1,
@@ -148,23 +146,24 @@ class Messenger(embodied.Env):
     new_ob = np.maximum.reduce([np.eye(self.n_entities)[layers[..., i]] for i
                                 in range(layers.shape[-1])])
     new_ob[:, :, 0] = 0
-    assert new_ob.shape == self.observation_space.shape, f'NEW OB: {new_ob.shape}; EXPECTED OB: {self.observation_space.shape}'
-    # assert new_ob.shape == self.observation_space["image"].shape
-    return new_ob
+    assert new_ob.shape == self.observation_space["image"].shape
+    return new_ob.astype(np.float32)
 
   @property
   def observation_space(self):
-      return spaces.Box(
+    obs_space = {
+      "image": spaces.Box(
         low=0,
         high=1,
         shape=(*self.grid_size, self.n_entities),
-      )
-    # obs_space = {
-    #   "image": spaces.Box(
-    #     low=0,
-    #     high=1,
-    #     shape=(*self.grid_size, self.n_entities),
-    #   ),
+      ),
+      "token_embed": spaces.Box(
+          -np.inf, np.inf,
+          shape=(512,),
+          dtype=np.float32)
+      }
+    return obs_space
+    
     #   "log_image": spaces.Box(
     #     low=0,
     #     high=255,
@@ -302,9 +301,7 @@ class Messenger(embodied.Env):
     del obs["entities"]
     del obs["avatar"]
     self._init_obs = obs
-    o = obs['image'].astype(np.float32)
-    # return obs
-    return o
+    return {'image': obs['image'], 'token_embed': obs['token_embed']}
 
   def step(self, action):
     if self.reading:
@@ -334,7 +331,7 @@ class Messenger(embodied.Env):
       elif self.read_step >= len(self.tokens):
         self.reading = False
         self.read_step = 0
-      return obs['image'].astype(np.float32), 0, False, None
+      return {'image': obs['image'], 'token_embed': obs['token_embed']}, 0, False, None
 
     self._step += 1 # don't increment step while reading
     obs, rew, done, info = self._env.step(action)
@@ -369,10 +366,7 @@ class Messenger(embodied.Env):
     if self._step >= self.length:
       done = True
       rew = -1
-    # return obs['image'][:9, :9], rew, done, info
-    o = obs['image'].astype(np.float32)
-    return o, rew, done, None
-    # return obs, rew, done, info
+    return {'image': obs['image'], 'token_embed': obs['token_embed']}, rew, done, None
 
   def make_image(self, img, ac, rew, done):
     assert len(img.shape) == 3

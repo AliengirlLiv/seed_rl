@@ -29,8 +29,7 @@ from absl import flags
 
 import os
 from seed_rl.agents.vtrace import learner
-# from seed_rl.agents.vtrace import networks
-from seed_rl.dmlab import networks
+from seed_rl.agents.vtrace import networks
 from seed_rl.common import actor
 from seed_rl.common import common_flags  
 from seed_rl.common import normalizer
@@ -55,17 +54,6 @@ flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
 
 FLAGS = flags.FLAGS
 
-
-# def create_agent(unused_action_space, unused_env_observation_space,
-#                  parametric_action_distribution):
-#   policy = networks.MLPandLSTM(
-#       parametric_action_distribution,
-#       mlp_sizes=[FLAGS.mlp_size] * FLAGS.n_mlp_layers,
-#       lstm_sizes=[FLAGS.lstm_size] * FLAGS.n_lstm_layers)
-#   if FLAGS.normalize_observations:
-#     policy = normalizer.NormalizeObservationsWrapper(policy,
-#                                                      normalizer.Normalizer())
-#   return policy
 
 def create_agent(action_space, unused_env_observation_space,
                  unused_parametric_action_distribution):
@@ -103,5 +91,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  print("GOT TO MAIN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
   app.run(main)
