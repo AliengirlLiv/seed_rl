@@ -19,8 +19,8 @@ Warning!!! This code uses DeepMind wrappers which differ from OpenAI gym
 wrappers and the results may not be comparable.
 """
 
-import sys
-sys.path = ['/home/jessy/olivia/docker_seed', '/seed_rl'] + sys.path
+# import sys
+# sys.path = ['/home/jessy/olivia/docker_seed', '/seed_rl'] + sys.path
 
 
 from absl import app
@@ -33,7 +33,7 @@ from seed_rl.agents.vtrace import networks
 from seed_rl.common import actor
 from seed_rl.common import common_flags  
 from seed_rl.common import normalizer
-from seed_rl.messenger_env import env
+from seed_rl.homecook import env
 import tensorflow as tf
 
 
@@ -49,8 +49,16 @@ flags.DEFINE_integer('lstm_size', 64, 'Sizes of each LSTM layer.')
 flags.DEFINE_bool('normalize_observations', False, 'Whether to normalize'
                   'observations by subtracting mean and dividing by stddev.')
 # Environment settings.
-flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
-flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
+flags.DEFINE_integer('max_steps', 100, 'Number of steps per episode.')
+flags.DEFINE_integer('num_trashobjs', 2, 'Number of trash objects.')
+flags.DEFINE_integer('num_trashcans', 2, 'Number of trash cans.')
+flags.DEFINE_float('p_teleport', 0.1, 'Probability of teleportation.')
+flags.DEFINE_float('p_unsafe', 0.1, 'Probability of unsafe.')
+flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
+flags.DEFINE_integer('preread_max', -1, 'Preread max.')
+flags.DEFINE_float('p_language', 0.2, 'p_language')
+flags.DEFINE_list('lang_types', ['task'], 'Language types.')
+
 
 FLAGS = flags.FLAGS
 
@@ -68,10 +76,21 @@ def create_optimizer(unused_final_iteration):
 
 def main(argv):
   create_environment = lambda task, config: env.create_environment(
-    task=FLAGS.task_name,
+    task='longcleanup',
     mode='train',
-    separate_sentences=FLAGS.separate_sentences,
-    message_prob=.2,
+    size=(64, 64),
+    # env config
+    max_steps=FLAGS.max_steps,
+    num_trashobjs=FLAGS.num_trashobjs,
+    num_trashcans=FLAGS.num_trashcans,
+    p_teleport=FLAGS.p_teleport,
+    p_unsafe=FLAGS.p_unsafe,
+    # lang wrapper config
+    language_obs="token_embeds",  # TODO: later, make the obs handle arbitrary keys and make this a flag
+    repeat_task_every=FLAGS.repeat_task_every,
+    preread_max=FLAGS.preread_max,
+    p_language=FLAGS.p_language,
+    lang_types=['task'],
   )
 
   if len(argv) > 1:

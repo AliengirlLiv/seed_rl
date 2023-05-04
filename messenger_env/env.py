@@ -1,29 +1,4 @@
-# coding=utf-8
-# Copyright 2019 The SEED Authors
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Mujoco environment from OpenAI gym."""
-
-from absl import flags
-
-import numpy as np
-from seed_rl.common import common_flags  
-from seed_rl.common import env_wrappers
-
-FLAGS = flags.FLAGS
-
-
-from . import embodied
+from seed_rl import embodied
 import numpy as np
 import gym
 from gym import spaces
@@ -62,7 +37,7 @@ class Messenger(embodied.Env):
     from messenger.envs.stage_three import StageThree
     from messenger.envs.wrappers import TwoEnvWrapper
     from messenger.envs.config import STATE_HEIGHT, STATE_WIDTH
-    from . import from_gym
+    from seed_rl import from_gym
 
     if task == "s1":
       mmode = "train" if mode == "train" else "val"
@@ -413,5 +388,4 @@ class Messenger(embodied.Env):
 
 def create_environment(task, mode, separate_sentences, message_prob):
     env = Messenger(task, mode, separate_sentences, message_prob)
-    # env = embodied.wrappers.PadResizeImage(env, (16, 16))
     return env

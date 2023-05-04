@@ -108,7 +108,7 @@ def actor_loop(create_env_fn, config=None, log_period=1):
             try:
               action = client.inference(env_id, run_id, env_output, raw_reward)
             except Exception as e:
-              print('FAILED ACTION', reward.dtype, done.dtype, observation.dtype, abandoned.dtype, episode_step.dtype)
+              print('FAILED ACTION', reward.dtype, done.dtype, type(observation), abandoned.dtype, episode_step.dtype)
               print(e)
               import pdb; pdb.set_trace()
           with timer_cls('actor/elapsed_env_step_s', 1000):
