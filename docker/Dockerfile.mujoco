@@ -12,8 +12,12 @@
 # limitations under the License.
 
 FROM tensorflow/tensorflow:2.4.1-gpu
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN rm /etc/apt/sources.list.d/nvidia-ml.list
+RUN ln -fs /usr/share/zoneinfo/Europe/Dublin /etc/localtime
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update 
+RUN apt-get install -y \
     libgl1-mesa-dev \
     libglew-dev \
     libosmesa6-dev \
@@ -21,18 +25,11 @@ RUN apt-get update && apt-get install -y \
     tmux \
     unzip
 
-# Download mujoco
-RUN curl https://www.roboti.us/download/mjpro150_linux.zip --output /tmp/mujoco.zip && \
-    mkdir -p /root/.mujoco && \
-    unzip /tmp/mujoco.zip -d /root/.mujoco && \
-    rm -f /tmp/mujoco.zip
+RUN apt install -y git-all python3-pip
 
-# Copy the mujoco license key
-COPY mjkey.txt /root/.mujoco/mjkey.txt
+RUN pip3 install cmake absl-py gym==0.21.0
 
 RUN pip3 install Cython cffi lockfile glfw imageio dataclasses gin-config
-RUN LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mjpro150/bin pip3 install gym[mujoco]
-RUN echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mjpro150/bin' >> /root/.bashrc
 
 RUN pip3 install tensorflow_probability==0.11.0
 

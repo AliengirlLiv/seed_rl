@@ -12,25 +12,30 @@
 # limitations under the License.
 
 FROM tensorflow/tensorflow:2.4.1-gpu
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN rm /etc/apt/sources.list.d/nvidia-ml.list
+RUN apt-get autoclean
 
-RUN apt-get update && apt-get install -y tmux ffmpeg libsm6 libxext6 libxrender-dev wget unrar unzip
-
+RUN ln -fs /usr/share/zoneinfo/Europe/Dublin /etc/localtime
+RUN apt-get autoremove
+RUN apt-get update &&  apt-get install -y tmux ffmpeg libsm6 libxext6 libxrender-dev wget unrar unzip
+RUN apt install -y git-all
 # Install Atari environment
+RUN pip3 install --upgrade pip
+RUN pip3 install cmake
 RUN pip3 install gym[atari]
 RUN pip3 install atari-py
 RUN pip3 install tensorflow_probability==0.11.0
-
 RUN mkdir roms && \
-    cd roms && \
-    wget http://www.atarimania.com/roms/Roms.rar && \
-    unrar e Roms.rar && \
-    unzip ROMS.zip && \
-    unzip "HC ROMS.zip" && \
+    cd roms
+RUN wget http://www.atarimania.com/roms/Roms.rar && \
+    unrar -o+ e Roms.rar && \
+    unzip -o ROMS.zip && \
+    unzip -o "HC ROMS.zip" && \
     rm ROMS.zip && \
     rm "HC ROMS.zip" && \
-    rm Roms.rar && \
-    python -m atari_py.import_roms .
-
+    rm Roms.rar
+RUN python -m atari_py.import_roms .
 
 # Copy SEED codebase and SEED GRPC binaries.
 ADD . /seed_rl/

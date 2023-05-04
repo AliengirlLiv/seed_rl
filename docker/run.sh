@@ -27,6 +27,10 @@ NUM_ACTORS=$3
 ENV_BATCH_SIZE=$4
 shift 4
 
+if [[ "$ENVIRONMENT" == "messenger" ]]; then
+    export ENVIRONMENT="messenger_env"
+fi
+
 export PYTHONPATH=$PYTHONPATH:/
 
 ACTOR_BINARY="CUDA_VISIBLE_DEVICES='' python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor";
