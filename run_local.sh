@@ -18,8 +18,7 @@ die () {
     echo >&2 "$@"
     exit 1
 }
-
-ENVIRONMENTS="atari|dmlab|football|mujoco"
+ENVIRONMENTS="atari|dmlab|football|mujoco|messenger|homecook"
 AGENTS="r2d2|vtrace|sac|ppo"
 [ "$#" -ne 0 ] || die "Usage: run_local.sh [$ENVIRONMENTS] [$AGENTS] [Num. actors]"
 echo $1 | grep -E -q $ENVIRONMENTS || die "Supported games: $ENVIRONMENTS"
@@ -39,11 +38,15 @@ fi
 export CONFIG=$ENVIRONMENT
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd $DIR
-docker/build.sh
+cd $DIR/..
+docker build --network=host -t tmp_seed_rl:${CONFIG} -f seed_rl/docker/Dockerfile.${CONFIG} .
+
 docker_version=$(docker version --format '{{.Server.Version}}')
-if [[ "19.03" > $docker_version ]]; then
-  docker run --entrypoint ./docker/run.sh -ti -it -p 6006-6015:6006-6015 --name seed --rm seed_rl:$ENVIRONMENT $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $@
-else
-  docker run --gpus all --entrypoint ./docker/run.sh -ti -it -p 6006-6015:6006-6015 -e HOST_PERMS="$(id -u):$(id -g)" --name seed --rm seed_rl:$ENVIRONMENT $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $@
-fi
+docker run -ti -it --network=host -p 6006-6015:6006-6015 \
+  -e HOST_PERMS="$(id -u):$(id -g)" \
+  -e ENVIRONMENT="$ENVIRONMENT" \
+  -e AGENT="$AGENT" \
+  -e NUM_ACTORS="$NUM_ACTORS" \
+  -e ENV_BATCH_SIZE="$ENV_BATCH_SIZE" \
+  --name seed --rm tmp_seed_rl:${CONFIG} \
+  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $@'
