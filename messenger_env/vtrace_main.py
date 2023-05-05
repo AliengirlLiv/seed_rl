@@ -52,7 +52,7 @@ flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.'
 FLAGS = flags.FLAGS
 
 
-def create_agent(action_space, unused_env_observation_space,
+def create_agent(action_space, env_observation_space,
                  unused_parametric_action_distribution):
   return networks.ImpalaDeep(action_space.n, vocab_size=env_observation_space['token'].high + 1, lang_key=FLAGS.lang_key)
 

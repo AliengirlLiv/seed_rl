@@ -135,7 +135,7 @@ class Messenger(embodied.Env):
       ),
       "token": spaces.Box(
           0, 32100,
-          shape=(1,),
+          shape=(),
           dtype=np.uint32),
       "token_embed": spaces.Box(
           -np.inf, np.inf,
@@ -209,7 +209,7 @@ class Messenger(embodied.Env):
         self.tokens += [tok for tok in ts]
       assert len(self.token_embeds) == len(self.tokens)
       obs.update({
-        "token": self.tokens[self.read_step],
+        "token": np.array(self.tokens[self.read_step], dtype=np.uint32),
         "token_embed": self.token_embeds[self.read_step],
       })
       self.reading = True
@@ -239,6 +239,8 @@ class Messenger(embodied.Env):
     del obs["entities"]
     del obs["avatar"]
     self._init_obs = obs
+    if 'info' in obs:
+      del obs['info']
     return obs
 
   def step(self, action):
@@ -246,7 +248,7 @@ class Messenger(embodied.Env):
       obs = self._init_obs
       obs["is_read_step"] = self.reading
       if self.language_obs == "token_embeds":
-        obs["token"] = self.tokens[self.read_step]
+        obs["token"] = np.array(self.tokens[self.read_step], dtype=np.uint32)
         obs["token_embed"] = self.token_embeds[self.read_step]
       elif self.language_obs == "token_embeds_all":
         obs.update({
@@ -265,6 +267,8 @@ class Messenger(embodied.Env):
       elif self.read_step >= len(self.tokens):
         self.reading = False
         self.read_step = 0
+      if 'info' in obs:
+        del obs['info']
       return obs, 0, False, None
 
     self._step += 1 # don't increment step while reading
@@ -274,9 +278,9 @@ class Messenger(embodied.Env):
     if self.language_obs == "strings":
       obs["language_info"] = self.manual
     elif self.language_obs == "tokens":
-      obs["token"] = self.empty_token_id
+      obs["token"] = np.array(self.empty_token_id, dtype=np.uint32)
     elif self.language_obs == "token_embeds":
-      obs["token"] = self.empty_token_id
+      obs["token"] = np.array(self.empty_token_id, dtype=np.uint32)
       obs["token_embed"] = self.empty_token_embed
     elif self.language_obs == "token_embeds_all":
       obs.update({
@@ -295,6 +299,8 @@ class Messenger(embodied.Env):
     if self._step >= self.length:
       done = True
       rew = -1
+    if 'info' in obs:
+      del obs['info']
     return obs, rew, done, None
 
   def make_image(self, img, ac, rew, done):
