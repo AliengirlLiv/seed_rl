@@ -42,11 +42,11 @@ RUN pip3 install google protobuf==3.20 tensorflow==2.4.1
 
 RUN pip3 install Cython cffi lockfile glfw imageio dataclasses gin-config
 RUN pip3 install tensorflow_probability==0.11.0
+RUN pip3 install numpy==1.19.5 matplotlib transformers wandb
 
 # Copy SEED codebase and env
 COPY seed_rl/ /seed_rl/
 COPY griddle/ /griddle/
 RUN cd griddle; pip3 install -e .
-RUN pip3 install numpy==1.19.5 matplotlib transformers
 
 WORKDIR /seed_rl

@@ -30,6 +30,7 @@ class Messenger(embodied.Env):
     assert mode in ("train", "eval")
     assert language_obs in ("strings", "token_embeds",
                             "token_embeds_all")
+    assert language_obs == "token_embeds", "currently only token_embeds supported"
     import messenger
     
     from messenger.envs.stage_one import StageOne
@@ -132,55 +133,22 @@ class Messenger(embodied.Env):
         high=1,
         shape=(*self.grid_size, self.n_entities),
       ),
+      "token": spaces.Box(
+          0, 32100,
+          shape=(1,),
+          dtype=np.uint32),
       "token_embed": spaces.Box(
           -np.inf, np.inf,
           shape=(512,),
-          dtype=np.float32)
+          dtype=np.float32),
+      "is_read_step": spaces.Box(
+        low=np.array(False),
+        high=np.array(True),
+        shape=(),
+        dtype=bool,
+      )
       }
     return obs_space
-    
-    #   "log_image": spaces.Box(
-    #     low=0,
-    #     high=255,
-    #     shape=(100 * self.grid_size[0], 100 * self.grid_size[1], 3),
-    #   ),
-    #   "is_read_step": spaces.Box(
-    #     low=np.array(False),
-    #     high=np.array(True),
-    #     shape=(),
-    #     dtype=bool,
-    #   )
-    # }
-
-    # if self.language_obs == "token_embeds":
-    #   obs_space.update({
-    #     "token": spaces.Box(
-    #       0, 32100,
-    #       shape=(),
-    #       dtype=np.uint32),
-    #     "token_embed": spaces.Box(
-    #       -np.inf, np.inf,
-    #       shape=(512,),
-    #       dtype=np.float32)
-    #   })
-    # elif self.language_obs == "token_embeds_all":
-    #   obs_space.update({
-    #     "token_embeds_all": spaces.Box(
-    #       -np.inf, np.inf,
-    #       shape=(3, self.max_token_seqlen, 512,),
-    #       dtype=np.float32),
-    #     "language_info_input_ids": spaces.Box(
-    #       0, np.inf,
-    #       shape=(self.max_token_seqlen * 3 + 1,),
-    #       dtype=np.int32),
-    #     "language_info_attention_mask": spaces.Box(
-    #       0, np.inf,
-    #       shape=(self.max_token_seqlen * 3 + 1,),
-    #       dtype=np.int32),
-    #   })
-    # else:
-    #   raise NotImplementedError(self.language_obs)
-    # return spaces.Dict(obs_space)
 
   @property
   def action_space(self):
@@ -265,18 +233,13 @@ class Messenger(embodied.Env):
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
       })
       self.reading = True
-    obs.update({
-      "log_language_info": self.manual,
-#      "log_tokens": self.tokens, # TODO: different length on each ep
-    })
     self.read_step += 1
     obs["image"] = self._symbolic_to_multihot(obs)
-    # obs["log_image"] = self.make_image(obs["image"], -1, 0, False)
     obs["is_read_step"] = self.reading
     del obs["entities"]
     del obs["avatar"]
     self._init_obs = obs
-    return {'image': obs['image'], 'token_embed': obs['token_embed']}
+    return obs
 
   def step(self, action):
     if self.reading:
@@ -294,10 +257,6 @@ class Messenger(embodied.Env):
 
       else:
         raise NotImplementedError()
-      obs.update({
-        "log_language_info": self.manual,
-#        "log_tokens": self.tokens,
-      })
       self.read_step += 1
       if self.language_obs == "token_embeds_all":
         if self.read_step >= 15:
@@ -306,7 +265,7 @@ class Messenger(embodied.Env):
       elif self.read_step >= len(self.tokens):
         self.reading = False
         self.read_step = 0
-      return {'image': obs['image'], 'token_embed': obs['token_embed']}, 0, False, None
+      return obs, 0, False, None
 
     self._step += 1 # don't increment step while reading
     obs, rew, done, info = self._env.step(action)
@@ -325,12 +284,7 @@ class Messenger(embodied.Env):
         "language_info_input_ids": self.full_manual_tokens["input_ids"],
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
       })
-    obs.update({
-      "log_language_info": self.manual,
-#      "log_tokens": self.tokens,
-    })
     obs["image"] = self._symbolic_to_multihot(obs)
-    # obs["log_image"] = self.make_image(obs["image"], action, rew, done)
     info.update({
       "entities": obs["entities"],
       "avatar": obs["avatar"],
@@ -341,7 +295,7 @@ class Messenger(embodied.Env):
     if self._step >= self.length:
       done = True
       rew = -1
-    return {'image': obs['image'], 'token_embed': obs['token_embed']}, rew, done, None
+    return obs, rew, done, None
 
   def make_image(self, img, ac, rew, done):
     assert len(img.shape) == 3

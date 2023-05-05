@@ -58,7 +58,7 @@ class HomeCook(embodied.Env):
                    p_unsafe=p_unsafe)
     env = RGBImgPartialObsWrapper(env)
     env = FilterObsWrapper(env, ["image"])
-    assert task == "longcleanup"
+    assert task == "longcleanup" and language_obs == "token_embeds"
     if language_obs == "token_embeds":
       env = MultitaskWrapper(env)
       env = LanguageWrapper(
@@ -77,7 +77,7 @@ class HomeCook(embodied.Env):
 
     env = Gym26Wrapper(env)
     self._env = env
-    self.observation_space = gym.spaces.dict.Dict({'image': env.observation_space['image'], 'token_embed': env.observation_space['token_embed']})
+    self.observation_space = env.observation_space
     self.action_space = self._env.action_space
     self.wrappers = [
       from_gym.FromGym,
@@ -86,15 +86,14 @@ class HomeCook(embodied.Env):
 
   def reset(self):
     obs = self._env.reset()
-    obs["log_image"] = self.render_with_text(obs["log_language_info"])
-    return {'image': obs["image"], 'token_embed': obs["token_embed"]}
+    del obs["log_language_info"]
+    obs["token"] = np.array(obs["token"], dtype=np.uint32)
     return obs
 
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
-    # Note: rendering full image on every obs slows down training
-    obs["log_image"] = self.render_with_text(obs["log_language_info"])
-    obs = {'image': obs["image"], 'token_embed': obs["token_embed"]}
+    del obs["log_language_info"]
+    obs["token"] = np.array(obs["token"], dtype=np.uint32)
     return obs, rew, done, info
 
   def render(self):

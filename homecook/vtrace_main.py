@@ -58,14 +58,15 @@ flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
 flags.DEFINE_integer('preread_max', -1, 'Preread max.')
 flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
 
 
 FLAGS = flags.FLAGS
 
 
-def create_agent(action_space, unused_env_observation_space,
+def create_agent(action_space, env_observation_space,
                  unused_parametric_action_distribution):
-  return networks.ImpalaDeep(action_space.n)
+  return networks.ImpalaDeep(action_space.n, vocab_size=env_observation_space['token'].high + 1, lang_key=FLAGS.lang_key)
 
 
 def create_optimizer(unused_final_iteration):

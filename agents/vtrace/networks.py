@@ -131,12 +131,15 @@ class ImpalaDeep(tf.Module):
   by Espeholt, Soyer, Munos et al.
   """
 
-  def __init__(self, num_actions, mlp_sizes=(64, 64)):
+  def __init__(self, num_actions, mlp_sizes=(64, 64), vocab_size=32100, lang_key='token'):
     super(ImpalaDeep, self).__init__(name='impala_deep')
 
     # Parameters and layers for unroll.
     self._num_actions = num_actions
     self._core = tf.keras.layers.LSTMCell(256)
+    self._lang_key = lang_key
+    if lang_key == 'token':
+      self._embedding = tf.keras.layers.Embedding(vocab_size, mlp_sizes[0])
 
     # Parameters and layers for _torso.
     self._stacks = [
@@ -173,8 +176,10 @@ class ImpalaDeep(tf.Module):
     conv_out = self._conv_to_linear(conv_out)
     conv_out = tf.nn.relu(conv_out)
     
-    # TODO: pass this in, don't hardcode the key
-    lang = self._mlp(obs['token_embed'])
+    token = obs[self._lang_key]
+    if self._lang_key == 'token':
+      lang = self._embedding(token)
+    lang = self._mlp(lang)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)

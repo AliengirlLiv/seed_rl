@@ -19,10 +19,6 @@ Warning!!! This code uses DeepMind wrappers which differ from OpenAI gym
 wrappers and the results may not be comparable.
 """
 
-import sys
-sys.path = ['/home/jessy/olivia/docker_seed', '/seed_rl'] + sys.path
-
-
 from absl import app
 from absl import flags
 
@@ -51,13 +47,14 @@ flags.DEFINE_bool('normalize_observations', False, 'Whether to normalize'
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
 flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
 
 FLAGS = flags.FLAGS
 
 
 def create_agent(action_space, unused_env_observation_space,
                  unused_parametric_action_distribution):
-  return networks.ImpalaDeep(action_space.n)
+  return networks.ImpalaDeep(action_space.n, vocab_size=env_observation_space['token'].high + 1, lang_key=FLAGS.lang_key)
 
 
 def create_optimizer(unused_final_iteration):
