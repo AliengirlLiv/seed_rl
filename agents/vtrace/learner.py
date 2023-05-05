@@ -23,7 +23,7 @@ import time
 from absl import flags
 from absl import logging
 
-from seed_rl import grpc
+from seed_rl import grpc2
 from seed_rl.common import common_flags  
 from seed_rl.common import utils
 from seed_rl.common import vtrace
@@ -66,6 +66,9 @@ flags.DEFINE_integer('log_batch_frequency', 100, 'We average that many batches '
                      'before logging batch statistics like entropy.')
 flags.DEFINE_integer('log_episode_frequency', 1, 'We average that many episodes'
                      ' before logging average episode return and length.')
+flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')  # TODO: change to False by default for debugging?
+flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
+flags.DEFINE_string('log_name', 'temp', 'Exp name, also used for wandb.')
 
 FLAGS = flags.FLAGS
 
@@ -187,6 +190,44 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   """
   logging.info('Starting learner loop')
   validate_config()
+  
+  config = FLAGS
+  if config.use_wandb:
+    import wandb
+    import pathlib
+    logdir = pathlib.Path(FLAGS.logdir) / FLAGS.log_name
+
+    wandb_id_file = f"{str(logdir)}/wandb_id.txt"
+    wandb_pa = pathlib.Path(wandb_id_file)
+    if wandb_pa.exists():
+      print("!! Resuming wandb run !!")
+      with open(wandb_id_file, "r") as f:
+        wandb_id = f.read().strip()
+    else:
+      logdir.mkdir(parents=True, exist_ok=True)
+      wandb_id = wandb.util.generate_id()
+      with open(wandb_id_file, "w") as f:
+        f.write(wandb_id)
+    if "homegrid" in config.env:
+      project = "homegridv3"
+    elif "messenger" in config.env:
+      project = "messenger"
+    elif "homecook" in config.env:
+      project = "homecook"
+    elif "vln" in config.env:
+      project = "vln"
+    else:
+      raise NotImplementedError
+    wandb.init(
+      id=wandb_id,
+      resume="allow",
+      project=project,
+      name=config.log_name,
+      group=config.log_name[:config.log_name.rfind("_")],
+      sync_tensorboard=True,
+      config=config.flag_values_dict(),
+    )
+  
   settings = utils.init_learner_multi_host(FLAGS.num_training_tpus)
   strategy, hosts, training_strategy, encode, decode = settings
   env = create_env_fn(0, FLAGS)
@@ -308,13 +349,17 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       tf.TensorSpec([], tf.int64, 'episode_num_frames'),
       tf.TensorSpec([], tf.float32, 'episode_returns'),
       tf.TensorSpec([], tf.float32, 'episode_raw_returns'),
+      tf.TensorSpec([], tf.int64, 'total_non_reading_frames'),
+      tf.TensorSpec([], tf.int64, 'total_frames'),
   )
 
   info_queue = utils.StructuredFIFOQueue(-1, info_specs)
 
   def create_host(i, host, inference_devices):
+    total_frames = tf.Variable(0, dtype=tf.int64)
+    total_non_reading_frames = tf.Variable(0, dtype=tf.int64)
     with tf.device(host):
-      server = grpc.Server([FLAGS.server_address])
+      server = grpc2.Server([FLAGS.server_address])
 
       store = utils.UnrollStore(
           FLAGS.num_envs, FLAGS.unroll_length,
@@ -359,6 +404,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
           if tf.not_equal(tf.shape(envs_needing_reset)[0], 0):
             tf.print('Environment ids needing reset:', envs_needing_reset)
           env_infos.reset(envs_needing_reset)
+          total_frames.assign_add(FLAGS.inference_batch_size)
+          reading = env_outputs.observation['is_read_step']
+          total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
           store.reset(envs_needing_reset)
           initial_agent_states = agent.initial_state(
               tf.shape(envs_needing_reset)[0])
@@ -371,12 +419,13 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
               'Abandoned done states are not supported in VTRACE.')
 
           # Update steps and return.
-          env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards))
+          env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, 0, 0))
           done_ids = tf.gather(env_ids, tf.where(env_outputs.done)[:, 0])
           if i == 0:
             info_queue.enqueue_many(env_infos.read(done_ids))
           env_infos.reset(done_ids)
-          env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0.))
+          assert FLAGS.num_action_repeats == 1
+          env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0., total_non_reading_frames * tf.cast(env_outputs.done, tf.int64), total_frames * tf.cast(env_outputs.done, tf.int64)))
 
           # Inference.
           prev_actions = actions.read(env_ids)
@@ -414,6 +463,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       servers.append(server)
 
   for i, (host, inference_devices) in enumerate(hosts):
+    print('Number of hosts: %d' % len(hosts))
     create_host(i, host, inference_devices)
 
   def dequeue(ctx):
@@ -454,14 +504,21 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       episode_keys = [
           'episode_num_frames', 'episode_return', 'episode_raw_return'
       ]
-      for key, values in zip(episode_keys, episode_stats):
+      for key, values in zip(episode_keys, episode_stats[:len(episode_keys)]):
         for value in tf.split(values,
                               values.shape[0] // FLAGS.log_episode_frequency):
           tf.summary.scalar(key, tf.reduce_mean(value))
+      global_keys = [
+          'total_non_reading_frames', 'total_frames'
+      ]
+      for key, values in zip(global_keys, episode_stats[len(episode_keys):]):
+        for value in tf.split(values,
+                              values.shape[0] // FLAGS.log_episode_frequency):
+          tf.summary.scalar(key, tf.reduce_max(value))
 
-      for (frames, ep_return, raw_return) in zip(*episode_stats):
-        logging.info('Return: %f Raw return: %f Frames: %i', ep_return,
-                     raw_return, frames)
+      for (frames, ep_return, raw_return, total_non_reading, total_frames) in zip(*episode_stats):
+        logging.info('Server %i; Return: %f Raw return: %f Frames: %i, Non reading: %i, Total frames: %i', i, ep_return,
+                     raw_return, frames, total_non_reading, total_frames)
 
   logger.start(additional_logs)
   # Execute learning.

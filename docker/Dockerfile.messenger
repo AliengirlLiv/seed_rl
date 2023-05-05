@@ -41,7 +41,7 @@ RUN pip3 install cmake absl-py gym==0.21.0
 RUN pip3 install google protobuf==3.20 tensorflow==2.4.1
 
 RUN pip3 install Cython cffi lockfile glfw imageio dataclasses gin-config
-RUN pip3 install tensorflow_probability==0.11.0
+RUN pip3 install tensorflow_probability==0.11.0 wandb
 
 # Copy SEED codebase and env
 COPY seed_rl/ /seed_rl/

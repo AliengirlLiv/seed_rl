@@ -18,7 +18,7 @@
 
 from absl import flags
 
-flags.DEFINE_string('logdir', '/tmp/agent', 'TensorFlow log directory.')
+flags.DEFINE_string('logdir', '/logs', 'TensorFlow log directory.')
 flags.DEFINE_alias('job-dir', 'logdir')
 flags.DEFINE_string('server_address', 'localhost:8686', 'Server address.',
                     allow_hide_cpp=True)

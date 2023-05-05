@@ -25,7 +25,8 @@ ENVIRONMENT=$1
 AGENT=$2
 NUM_ACTORS=$3
 ENV_BATCH_SIZE=$4
-shift 4
+WANDB_API_KEY=$5
+shift 5
 
 if [[ "$ENVIRONMENT" == "messenger" ]]; then
     export ENVIRONMENT="messenger_env"
@@ -33,7 +34,7 @@ fi
 
 export PYTHONPATH=$PYTHONPATH:/
 
-ACTOR_BINARY="CUDA_VISIBLE_DEVICES='' python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor";
+ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES='' python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor";
 LEARNER_BINARY="python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=learner";
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 NUM_ENVS=$(($NUM_ACTORS*$ENV_BATCH_SIZE))
@@ -61,6 +62,7 @@ COMMAND='rm /tmp/agent -Rf; '"${LEARNER_BINARY}"' --logtostderr --pdb_post_morte
 echo $COMMAND
 tmux send-keys -t "learner" "$COMMAND" ENTER
 
+echo "NUM_ACTORS: ${NUM_ACTORS}"
 for ((id=0; id<$NUM_ACTORS; id++)); do
     tmux new-window -d -n "actor_${id}"
     COMMAND=''"${ACTOR_BINARY}"' --logtostderr --pdb_post_mortem '"$@"' --num_envs='"${NUM_ENVS}"' --task='"${id}"' --env_batch_size='"${ENV_BATCH_SIZE}"''
@@ -68,6 +70,7 @@ for ((id=0; id<$NUM_ACTORS; id++)); do
 done
 
 tmux new-window -d -n tensorboard
-tmux send-keys -t "tensorboard" "tensorboard --logdir /tmp/agent/ --bind_all" ENTER
+mkdir /logs
+tmux send-keys -t "tensorboard" "tensorboard --logdir /logs/ --bind_all" ENTER
 
 tmux attach -t seed_rl

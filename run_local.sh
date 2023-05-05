@@ -37,6 +37,9 @@ else
 fi
 export CONFIG=$ENVIRONMENT
 
+export WANDB_API_KEY=$1
+shift 1
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $DIR/..
 docker build --network=host -t tmp_seed_rl:${CONFIG} -f seed_rl/docker/Dockerfile.${CONFIG} .
@@ -48,5 +51,6 @@ docker run -ti -it --network=host -p 6006-6015:6006-6015 \
   -e AGENT="$AGENT" \
   -e NUM_ACTORS="$NUM_ACTORS" \
   -e ENV_BATCH_SIZE="$ENV_BATCH_SIZE" \
+  -e WANDB_API_KEY="$WANDB_API_KEY" \
   --name seed --rm tmp_seed_rl:${CONFIG} \
-  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $@'
+  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $WANDB_API_KEY $@'
