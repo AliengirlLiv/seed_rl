@@ -45,7 +45,7 @@ cd $DIR/..
 docker build --network=host -t tmp_seed_rl:${CONFIG} -f seed_rl/docker/Dockerfile.${CONFIG} .
 
 docker_version=$(docker version --format '{{.Server.Version}}')
-docker run -ti -it --network=host -p 6006-6015:6006-6015 \
+docker run --gpus all -ti -it --network=host -p 6006-6015:6006-6015 \
   -e HOST_PERMS="$(id -u):$(id -g)" \
   -e ENVIRONMENT="$ENVIRONMENT" \
   -e AGENT="$AGENT" \
