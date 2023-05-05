@@ -30,7 +30,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
-  name='grpc/service.proto',
+  name='grpc2/service.proto',
   package='seed_rl',
   syntax='proto3',
   serialized_options=None,
@@ -225,35 +225,35 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 InitRequest = _reflection.GeneratedProtocolMessageType('InitRequest', (_message.Message,), {
   'DESCRIPTOR' : _INITREQUEST,
-  '__module__' : 'grpc.service_pb2'
+  '__module__' : 'grpc2.service_pb2'
   # @@protoc_insertion_point(class_scope:seed_rl.InitRequest)
   })
 _sym_db.RegisterMessage(InitRequest)
 
 MethodOutputSignature = _reflection.GeneratedProtocolMessageType('MethodOutputSignature', (_message.Message,), {
   'DESCRIPTOR' : _METHODOUTPUTSIGNATURE,
-  '__module__' : 'grpc.service_pb2'
+  '__module__' : 'grpc2.service_pb2'
   # @@protoc_insertion_point(class_scope:seed_rl.MethodOutputSignature)
   })
 _sym_db.RegisterMessage(MethodOutputSignature)
 
 InitResponse = _reflection.GeneratedProtocolMessageType('InitResponse', (_message.Message,), {
   'DESCRIPTOR' : _INITRESPONSE,
-  '__module__' : 'grpc.service_pb2'
+  '__module__' : 'grpc2.service_pb2'
   # @@protoc_insertion_point(class_scope:seed_rl.InitResponse)
   })
 _sym_db.RegisterMessage(InitResponse)
 
 CallRequest = _reflection.GeneratedProtocolMessageType('CallRequest', (_message.Message,), {
   'DESCRIPTOR' : _CALLREQUEST,
-  '__module__' : 'grpc.service_pb2'
+  '__module__' : 'grpc2.service_pb2'
   # @@protoc_insertion_point(class_scope:seed_rl.CallRequest)
   })
 _sym_db.RegisterMessage(CallRequest)
 
 CallResponse = _reflection.GeneratedProtocolMessageType('CallResponse', (_message.Message,), {
   'DESCRIPTOR' : _CALLRESPONSE,
-  '__module__' : 'grpc.service_pb2'
+  '__module__' : 'grpc2.service_pb2'
   # @@protoc_insertion_point(class_scope:seed_rl.CallResponse)
   })
 _sym_db.RegisterMessage(CallResponse)

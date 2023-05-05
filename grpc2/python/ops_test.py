@@ -26,7 +26,7 @@ import uuid
 
 from absl.testing import parameterized
 import numpy as np
-from seed_rl.grpc.python import ops
+from seed_rl.grpc2.python import ops
 from six.moves import range
 import tensorflow as tf
 

@@ -20,7 +20,7 @@ import timeit
 from absl import flags
 from absl import logging
 import numpy as np
-from seed_rl import grpc
+from seed_rl import grpc2
 from seed_rl.common import common_flags  
 from seed_rl.common import env_wrappers
 from seed_rl.common import profiling
@@ -71,7 +71,7 @@ def actor_loop(create_env_fn, config=None, log_period=1):
     while True:
       try:
         # Client to communicate with the learner.
-        client = grpc.Client(FLAGS.server_address)
+        client = grpc2.Client(FLAGS.server_address)
         utils.update_config(config, client)
         batched_env = env_wrappers.BatchedEnvironment(
             create_env_fn, env_batch_size, FLAGS.task * env_batch_size, config)
