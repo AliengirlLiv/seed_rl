@@ -27,7 +27,8 @@ NUM_ACTORS=$3
 ENV_BATCH_SIZE=$4
 WANDB_API_KEY=$5
 GPU=$6
-shift 6
+EXPID=$7
+shift 7
 args="$@"
 echo "All arguments: $args"
 
@@ -37,8 +38,8 @@ fi
 
 export PYTHONPATH=$PYTHONPATH:/
 
-ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=${GPU} python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor";
-LEARNER_BINARY="CUDA_VISIBLE_DEVICES=${GPU} python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=learner";
+ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=${GPU} python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor --exp_name=L${EXPID}";
+LEARNER_BINARY="CUDA_VISIBLE_DEVICES=${GPU} python3 ../${ENVIRONMENT}/${AGENT}_main.py --run_mode=learner --exp_name=L${EXPID}";
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 NUM_ENVS=$(($NUM_ACTORS*$ENV_BATCH_SIZE))
 
@@ -74,6 +75,6 @@ done
 
 tmux new-window -d -n tensorboard
 mkdir /logs
-tmux send-keys -t "tensorboard" "tensorboard --logdir /logs/ --bind_all" ENTER
+tmux send-keys -t "tensorboard" "tensorboard --logdir /logs/ --port 6$EXPID --bind_all" ENTER
 
 tmux attach -t seed_rl

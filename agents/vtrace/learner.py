@@ -39,7 +39,7 @@ flags.DEFINE_integer('save_checkpoint_secs', 1800,
                      'Checkpoint save period in seconds.')
 flags.DEFINE_integer('total_environment_frames', int(1e9),
                      'Total environment frames to train for.')
-flags.DEFINE_integer('batch_size', 128, 'Batch size for training.')
+flags.DEFINE_integer('batch_size', 32, 'Batch size for training.')
 flags.DEFINE_integer('inference_batch_size', -1,
                      'Batch size for inference, -1 for auto-tune.')
 flags.DEFINE_integer('unroll_length', 100, 'Unroll length in agent steps.')
@@ -68,7 +68,7 @@ flags.DEFINE_integer('log_episode_frequency', 1, 'We average that many episodes'
                      ' before logging average episode return and length.')
 flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')  # TODO: change to False by default for debugging?
 flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
-flags.DEFINE_string('log_name', 'temp', 'Exp name, also used for wandb.')
+flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
 
 FLAGS = flags.FLAGS
 
@@ -195,7 +195,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   if config.use_wandb:
     import wandb
     import pathlib
-    logdir = pathlib.Path(FLAGS.logdir) / FLAGS.log_name
+    logdir = pathlib.Path(FLAGS.logdir) / FLAGS.exp_name
 
     wandb_id_file = f"{str(logdir)}/wandb_id.txt"
     wandb_pa = pathlib.Path(wandb_id_file)
@@ -222,8 +222,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       id=wandb_id,
       resume="allow",
       project=project,
-      name=config.log_name,
-      group=config.log_name[:config.log_name.rfind("_")],
+      name=config.exp_name,
+      group=config.exp_name[:config.exp_name.rfind("_")],
       sync_tensorboard=True,
       config=config.flag_values_dict(),
     )

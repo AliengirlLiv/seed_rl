@@ -39,7 +39,8 @@ export CONFIG=$ENVIRONMENT
 
 export WANDB_API_KEY=$1
 export GPU=$2
-shift 2
+export EXPID=$3
+shift 3
 args="$@"
 echo "OG All arguments: $args"
 
@@ -48,7 +49,7 @@ cd $DIR/..
 docker build --network=host -t tmp_seed_rl:${CONFIG} -f seed_rl/docker/Dockerfile.${CONFIG} .
 
 docker_version=$(docker version --format '{{.Server.Version}}')
-docker run --gpus all -ti -it --network=host -p 6006-6015:6006-6015 \
+docker run --gpus all -ti -it --network=host -p 6${EXPID}:6${EXPID} \
   -e HOST_PERMS="$(id -u):$(id -g)" \
   -e ENVIRONMENT="$ENVIRONMENT" \
   -e AGENT="$AGENT" \
@@ -56,6 +57,7 @@ docker run --gpus all -ti -it --network=host -p 6006-6015:6006-6015 \
   -e ENV_BATCH_SIZE="$ENV_BATCH_SIZE" \
   -e WANDB_API_KEY="$WANDB_API_KEY" \
   -e GPU="$GPU" \
+  -e EXPID="$EXPID" \
   -e args="$args" \
-  --name seed --rm tmp_seed_rl:${CONFIG} \
-  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $WANDB_API_KEY $GPU $args'
+  --name seed_${EXPID} --rm tmp_seed_rl:${CONFIG} \
+  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $WANDB_API_KEY $GPU $EXPID $args'

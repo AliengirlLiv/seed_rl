@@ -37,9 +37,9 @@ flags.DEFINE_list('cnn_sizes', [16, 32, 32], 'Sizes of each of CNN hidden layer.
 flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
-flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
+flags.DEFINE_integer('length', 64, 'Length of environment.')
 
 FLAGS = flags.FLAGS
 
@@ -55,6 +55,8 @@ def create_agent(action_space, env_observation_space,
 
 
 def create_optimizer(unused_final_iteration):
+  from tensorflow.keras.optimizers.schedules import PolynomialDecay
+  # lr_schedule = PolynomialDecay(FLAGS.learning_rate, unused_final_iteration, 1e-5)
   learning_rate_fn = lambda iteration: FLAGS.learning_rate
   optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
   return optimizer, learning_rate_fn
@@ -66,8 +68,7 @@ def main(argv):
   create_environment = lambda task, config: env.create_environment(
     task=FLAGS.task_name,
     mode='train',
-    separate_sentences=FLAGS.separate_sentences,
-    message_prob=.2,
+    length=FLAGS.length,
   )
 
   if len(argv) > 1:

@@ -346,6 +346,6 @@ class Messenger(embodied.Env):
     return new_img
 
 
-def create_environment(task, mode, separate_sentences, message_prob):
-    env = Messenger(task, mode, separate_sentences, message_prob)
+def create_environment(task, mode, length):
+    env = Messenger(task, mode, length=length)
     return env
