@@ -22,39 +22,36 @@ wrappers and the results may not be comparable.
 from absl import app
 from absl import flags
 
-
-import os
+import random
 from seed_rl.agents.vtrace import learner
 from seed_rl.agents.vtrace import networks
 from seed_rl.common import actor
-from seed_rl.common import common_flags  
-from seed_rl.common import normalizer
 from seed_rl.messenger_env import env
 import tensorflow as tf
-
 
 # Optimizer settings.
 flags.DEFINE_float('learning_rate', 3e-4, 'Learning rate.')
 # Network settings.
-flags.DEFINE_integer('n_mlp_layers', 2, 'Number of MLP hidden layers.')
-flags.DEFINE_integer('mlp_size', 64, 'Sizes of each of MLP hidden layer.')
-flags.DEFINE_integer(
-    'n_lstm_layers', 0,
-    'Number of LSTM layers. LSTM layers are applied after MLP layers.')
-flags.DEFINE_integer('lstm_size', 64, 'Sizes of each LSTM layer.')
-flags.DEFINE_bool('normalize_observations', False, 'Whether to normalize'
-                  'observations by subtracting mean and dividing by stddev.')
+flags.DEFINE_list('mlp_sizes', [64, 64], 'Sizes of each of MLP hidden layer.')
+flags.DEFINE_list('cnn_sizes', [16, 32, 32], 'Sizes of each of CNN hidden layer.')
+flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
 flags.DEFINE_bool('separate_sentences', True, 'Split sentences in encoding.')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
+flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 FLAGS = flags.FLAGS
 
 
 def create_agent(action_space, env_observation_space,
                  unused_parametric_action_distribution):
-  return networks.ImpalaDeep(action_space.n, vocab_size=env_observation_space['token'].high + 1, lang_key=FLAGS.lang_key)
+  return networks.ImpalaDeep(action_space.n,
+                             lstm_size=FLAGS.lstm_size,
+                             mlp_sizes=[int(s) for s in FLAGS.mlp_sizes],
+                             cnn_sizes=[int(s) for s in FLAGS.cnn_sizes],
+                             vocab_size=env_observation_space['token'].high + 1,
+                             lang_key=FLAGS.lang_key)
 
 
 def create_optimizer(unused_final_iteration):
@@ -64,6 +61,8 @@ def create_optimizer(unused_final_iteration):
 
 
 def main(argv):
+  tf.random.set_seed(FLAGS.seed)
+  random.seed(FLAGS.seed)
   create_environment = lambda task, config: env.create_environment(
     task=FLAGS.task_name,
     mode='train',

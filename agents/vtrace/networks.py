@@ -131,23 +131,24 @@ class ImpalaDeep(tf.Module):
   by Espeholt, Soyer, Munos et al.
   """
 
-  def __init__(self, num_actions, mlp_sizes=(64, 64), vocab_size=32100, lang_key='token'):
+  def __init__(self, num_actions, mlp_sizes=(64, 64), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token', lstm_size=256):
     super(ImpalaDeep, self).__init__(name='impala_deep')
 
     # Parameters and layers for unroll.
     self._num_actions = num_actions
-    self._core = tf.keras.layers.LSTMCell(256)
+    self._core = tf.keras.layers.LSTMCell(lstm_size)
     self._lang_key = lang_key
     if lang_key == 'token':
       self._embedding = tf.keras.layers.Embedding(vocab_size, mlp_sizes[0])
+    else:
+      mlp_layers = [tf.keras.layers.Dense(size, 'relu') for size in mlp_sizes]
+      self._mlp = tf.keras.Sequential(mlp_layers)
 
     # Parameters and layers for _torso.
     self._stacks = [
-        _Stack(num_ch, num_blocks)
-        for num_ch, num_blocks in [(16, 2), (32, 2), (32, 2)]
+        _Stack(num_ch, 2)
+        for num_ch in cnn_sizes
     ]
-    mlp_layers = [tf.keras.layers.Dense(size, 'relu') for size in mlp_sizes]
-    self._mlp = tf.keras.Sequential(mlp_layers)
     self._conv_to_linear = tf.keras.layers.Dense(256)
 
     # Layers for _head.
@@ -179,7 +180,8 @@ class ImpalaDeep(tf.Module):
     token = obs[self._lang_key]
     if self._lang_key == 'token':
       lang = self._embedding(token)
-    lang = self._mlp(lang)
+    else:
+      lang = self._mlp(lang)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)

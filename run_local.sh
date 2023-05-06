@@ -38,7 +38,10 @@ fi
 export CONFIG=$ENVIRONMENT
 
 export WANDB_API_KEY=$1
-shift 1
+export GPU=$2
+shift 2
+args="$@"
+echo "OG All arguments: $args"
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd $DIR/..
@@ -52,5 +55,7 @@ docker run --gpus all -ti -it --network=host -p 6006-6015:6006-6015 \
   -e NUM_ACTORS="$NUM_ACTORS" \
   -e ENV_BATCH_SIZE="$ENV_BATCH_SIZE" \
   -e WANDB_API_KEY="$WANDB_API_KEY" \
+  -e GPU="$GPU" \
+  -e args="$args" \
   --name seed --rm tmp_seed_rl:${CONFIG} \
-  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $WANDB_API_KEY $@'
+  conda run -n embodied --no-capture-output /bin/bash -c 'docker/run.sh $ENVIRONMENT $AGENT $NUM_ACTORS $ENV_BATCH_SIZE $WANDB_API_KEY $GPU $args'
