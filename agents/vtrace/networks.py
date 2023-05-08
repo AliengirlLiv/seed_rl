@@ -181,7 +181,7 @@ class ImpalaDeep(tf.Module):
     if self._lang_key == 'token':
       lang = self._embedding(token)
     else:
-      lang = self._mlp(lang)
+      lang = self._mlp(token)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)
