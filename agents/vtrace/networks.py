@@ -48,13 +48,6 @@ class MLPandLSTM(tf.Module):
     self._policy_logits = tf.keras.layers.Dense(
         parametric_action_distribution.param_size, name='policy_logits')
     self._baseline = tf.keras.layers.Dense(1, name='baseline')
-    
-    # Compute the number of parameters
-    import numpy as np
-    num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
-
-    # Print the number of parameters
-    print(f'Total number of parameters: {num_params}')
 
   @tf.function
   def initial_state(self, batch_size):
@@ -233,6 +226,25 @@ class ImpalaDeep(tf.Module):
     if not unroll:
       # Remove time dimension.
       outputs = tf.nest.map_structure(lambda t: tf.squeeze(t, 0), outputs)
+        
+    # Compute the number of parameters
+    import numpy as np
+    num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
+
+    # Print the number of parameters
+    print("!"* 1000)
+    print(f'Total number of parameters: {num_params}')
+    if hasattr(self, '_embedding'):
+      print(f'Number of embedding params: {np.prod(self._embedding.weights[0].shape)}')
+    print(f'Number of lstm params: {np.prod(self._core.weights[0].shape)}')
+    if hasattr(self, '_mlp'):
+      print(f'Number of mlp params: {np.prod(self._mlp.weights[0].shape)}')
+    print(f'Number of cnn params: {np.sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
+    print(f'Number of conv_to_linear params: {np.prod(self._conv_to_linear.weights[0].shape)}')
+    print(f'Number of policy_logits params: {np.prod(self._policy_logits.weights[0].shape)}')
+    print(f'Number of baseline params: {np.prod(self._baseline.weights[0].shape)}')
+    if hasattr(self, '_embedding'):
+      print(f'Number of params not in embedding: {num_params - np.prod(self._embedding.weights[0].shape)}')
 
     return outputs, core_state
 

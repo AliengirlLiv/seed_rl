@@ -64,3 +64,7 @@ docker run --gpus all -ti -it --network=host -p 6${EXPID}:6${EXPID} \
 
 container_id=$(docker inspect -f '{{.Id}}' seed_${EXPID})
 docker cp container_id:/logs ../logs/L${EXPID}
+
+# docker run --gpus all -ti -it --network=host -p 6${EXPID}:6${EXPID} \
+#   --name seed_${EXPID} --rm tmp_seed_rl:${CONFIG} \
+#   conda run -n embodied --no-capture-output /bin/bash
