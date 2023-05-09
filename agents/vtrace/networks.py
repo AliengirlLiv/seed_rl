@@ -131,18 +131,19 @@ class ImpalaDeep(tf.Module):
   by Espeholt, Soyer, Munos et al.
   """
 
-  def __init__(self, num_actions, mlp_sizes=(64, 64), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token', lstm_size=256):
+  def __init__(self, num_actions, mlp_sizes=(64,), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token', lstm_size=256, policy_sizes=(), value_sizes=()):
     super(ImpalaDeep, self).__init__(name='impala_deep')
 
     # Parameters and layers for unroll.
     self._num_actions = num_actions
     self._core = tf.keras.layers.LSTMCell(lstm_size)
     self._lang_key = lang_key
-    if lang_key == 'token':
-      self._embedding = tf.keras.layers.Embedding(vocab_size, mlp_sizes[0])
-    else:
-      mlp_layers = [tf.keras.layers.Dense(size, 'relu') for size in mlp_sizes]
-      self._mlp = tf.keras.Sequential(mlp_layers)
+    self._vocab_size = vocab_size
+    mlp_layers = []
+    for size in mlp_sizes:
+      mlp_layers.append(tf.keras.layers.Dense(size, 'silu'))
+      mlp_layers.append(tf.keras.layers.LayerNormalization())
+    self._mlp = tf.keras.Sequential(mlp_layers)
 
     # Parameters and layers for _torso.
     self._stacks = [
@@ -152,9 +153,19 @@ class ImpalaDeep(tf.Module):
     self._conv_to_linear = tf.keras.layers.Dense(256)
 
     # Layers for _head.
-    self._policy_logits = tf.keras.layers.Dense(
-        self._num_actions, name='policy_logits')
-    self._baseline = tf.keras.layers.Dense(1, name='baseline')
+    layer_list = []
+    for size in policy_sizes:
+      layer_list.append(tf.keras.layers.Dense(size, 'swish'))
+      layer_list.append(tf.keras.layers.LayerNormalization())
+    layer_list.append(tf.keras.layers.Dense(self._num_actions, name='policy_logits'))
+    self._policy_logits = tf.keras.Sequential(layer_list)
+    
+    layer_list = []
+    for size in value_sizes:
+      layer_list.append(tf.keras.layers.Dense(size, 'swish'))
+      layer_list.append(tf.keras.layers.LayerNormalization())
+    layer_list.append(tf.keras.layers.Dense(1, name='baseline'))
+    self._baseline = tf.keras.Sequential(layer_list)
 
   def initial_state(self, batch_size):
     return self._core.get_initial_state(batch_size=batch_size, dtype=tf.float32)
@@ -179,9 +190,9 @@ class ImpalaDeep(tf.Module):
     
     token = obs[self._lang_key]
     if self._lang_key == 'token':
-      lang = self._embedding(token)
-    else:
-      lang = self._mlp(token)
+      # One-hot encoding
+      token = tf.one_hot(token, self._vocab_size)
+    lang = self._mlp(token)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)

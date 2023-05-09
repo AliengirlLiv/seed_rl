@@ -37,9 +37,11 @@ import tensorflow as tf
 # Optimizer settings.
 flags.DEFINE_float('learning_rate', 3e-4, 'Learning rate.')
 # Network settings.
-flags.DEFINE_list('mlp_sizes', [64, 64], 'Sizes of each of MLP hidden layer.')
+flags.DEFINE_list('mlp_sizes', [64], 'Sizes of each of MLP hidden layer.')
 flags.DEFINE_list('cnn_sizes', [16, 32, 32], 'Sizes of each of CNN hidden layer.')
 flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
+flags.DEFINE_list('policy_sizes', [], 'Sizes of each of policy MLP hidden layer.')
+flags.DEFINE_list('value_sizes', [], 'Sizes of each of value MLP hidden layer.')
 # Environment settings.
 flags.DEFINE_integer('max_steps', 100, 'Number of steps per episode.')
 flags.DEFINE_integer('num_trashobjs', 2, 'Number of trash objects.')
@@ -64,7 +66,9 @@ def create_agent(action_space, env_observation_space,
                              mlp_sizes=[int(size) for size in FLAGS.mlp_sizes],
                              cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
                              vocab_size=env_observation_space['token'].high + 1,
-                             lang_key=FLAGS.lang_key)
+                             lang_key=FLAGS.lang_key,
+                             policy_sizes=[int(size) for size in FLAGS.policy_sizes],
+                             value_sizes=[int(size) for size in FLAGS.value_sizes])
 
 
 def create_optimizer(unused_final_iteration):
