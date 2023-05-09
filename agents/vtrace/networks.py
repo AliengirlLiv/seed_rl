@@ -48,6 +48,13 @@ class MLPandLSTM(tf.Module):
     self._policy_logits = tf.keras.layers.Dense(
         parametric_action_distribution.param_size, name='policy_logits')
     self._baseline = tf.keras.layers.Dense(1, name='baseline')
+    
+    # Compute the number of parameters
+    import numpy as np
+    num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
+
+    # Print the number of parameters
+    print(f'Total number of parameters: {num_params}')
 
   @tf.function
   def initial_state(self, batch_size):
