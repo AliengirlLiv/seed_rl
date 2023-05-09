@@ -141,7 +141,7 @@ class ImpalaDeep(tf.Module):
     self._vocab_size = vocab_size
     mlp_layers = []
     for size in mlp_sizes:
-      mlp_layers.append(tf.keras.layers.Dense(size, 'silu'))
+      mlp_layers.append(tf.keras.layers.Dense(size, 'swish'))
       mlp_layers.append(tf.keras.layers.LayerNormalization())
     self._mlp = tf.keras.Sequential(mlp_layers)
 
