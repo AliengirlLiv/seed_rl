@@ -140,9 +140,11 @@ class ImpalaDeep(tf.Module):
     self._lang_key = lang_key
     self._vocab_size = vocab_size
     mlp_layers = []
-    for size in mlp_sizes:
-      mlp_layers.append(tf.keras.layers.Dense(size, 'swish'))
-      mlp_layers.append(tf.keras.layers.LayerNormalization())
+    for i, size in enumerate(mlp_sizes):
+      act = 'swish' if i < len(mlp_sizes) - 1 else None
+      mlp_layers.append(tf.keras.layers.Dense(size, act))
+      if i < len(mlp_sizes) - 1:
+        mlp_layers.append(tf.keras.layers.LayerNormalization())
     self._mlp = tf.keras.Sequential(mlp_layers)
 
     # Parameters and layers for _torso.
