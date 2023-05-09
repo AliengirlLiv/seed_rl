@@ -235,16 +235,16 @@ class ImpalaDeep(tf.Module):
     print("!"* 1000)
     print(f'Total number of parameters: {num_params}')
     if hasattr(self, '_embedding'):
-      print(f'Number of embedding params: {np.prod(self._embedding.weights[0].shape)}')
-    print(f'Number of lstm params: {np.prod(self._core.weights[0].shape)}')
+      print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+    print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
     if hasattr(self, '_mlp'):
-      print(f'Number of mlp params: {np.prod(self._mlp.weights[0].shape)}')
-    print(f'Number of cnn params: {np.sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
-    print(f'Number of conv_to_linear params: {np.prod(self._conv_to_linear.weights[0].shape)}')
-    print(f'Number of policy_logits params: {np.prod(self._policy_logits.weights[0].shape)}')
-    print(f'Number of baseline params: {np.prod(self._baseline.weights[0].shape)}')
+      print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
+    print(f'Number of cnn params: {sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
+    print(f'Number of conv_to_linear params: {sum([np.prod(v.shape) for v in self._conv_to_linear.trainable_variables])}')
+    print(f'Number of policy_logits params: {sum([np.prod(v.shape) for v in self._policy_logits.trainable_variables])}')
+    print(f'Number of baseline params: {sum([np.prod(v.shape) for v in self._baseline.trainable_variables])}')
     if hasattr(self, '_embedding'):
-      print(f'Number of params not in embedding: {num_params - np.prod(self._embedding.weights[0].shape)}')
+      print(f'Number of params not in embedding: {num_params - sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
 
     return outputs, core_state
 
