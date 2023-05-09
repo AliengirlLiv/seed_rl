@@ -191,6 +191,7 @@ class ImpalaDeep(tf.Module):
     token = obs[self._lang_key]
     if self._lang_key == 'token':
       # One-hot encoding
+      token = tf.cast(token, tf.int32)
       token = tf.one_hot(token, self._vocab_size)
     lang = self._mlp(token)
     
