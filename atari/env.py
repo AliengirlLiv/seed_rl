@@ -48,12 +48,9 @@ def create_environment(task, config):
   env = gym.make(full_game_name, full_action_space=True)
   env.seed(task)
 
-  if not isinstance(env, gym.wrappers.TimeLimit):
-    raise ValueError('We expected gym.make to wrap the env with TimeLimit. '
-                     'Got {}.'.format(type(env)))
   # Change TimeLimit wrapper to 108,000 steps (30 min) as default in the
   # litterature instead of OpenAI Gym's default of 100,000 steps.
-  env = gym.wrappers.TimeLimit(env.env, max_episode_steps=108000)
+  # env = gym.wrappers.TimeLimit(env.env, max_episode_steps=108000)
   return atari_preprocessing.AtariPreprocessing(
       env,
       frame_skip=config.num_action_repeats,

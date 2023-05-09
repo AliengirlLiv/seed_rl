@@ -111,9 +111,9 @@ class AtariPreprocessing(object):
       return
     # Other no-ops implementations actually always do at least 1 no-op. We
     # follow them.
-    no_ops = self.environment.np_random.randint(1, self.max_random_noops + 1)
+    no_ops = self.environment.np_random.integers(1, self.max_random_noops + 1)
     for _ in range(no_ops):
-      _, _, game_over, _ = self.environment.step(0)
+      _, _, game_over, _, _ = self.environment.step(0)
       if game_over:
         self.environment.reset()
 
@@ -175,7 +175,7 @@ class AtariPreprocessing(object):
     for time_step in range(self.frame_skip):
       # We bypass the Gym observation altogether and directly fetch the
       # grayscale image from the ALE. This is a little faster.
-      _, reward, game_over, info = self.environment.step(action)
+      _, reward, game_over, _, info = self.environment.step(action)
       accumulated_reward += reward
 
       if self.terminal_on_life_loss:

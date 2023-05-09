@@ -35,7 +35,7 @@ import time
 
 from absl import flags
 from absl import logging
-from seed_rl import grpc
+from seed_rl import grpc2
 from seed_rl.common import common_flags  
 from seed_rl.common import utils
 import tensorflow as tf
@@ -653,7 +653,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     ckpt.restore(manager.latest_checkpoint).assert_consumed()
     last_ckpt_time = time.time()
 
-  server = grpc.Server([FLAGS.server_address])
+  server = grpc2.Server([FLAGS.server_address])
 
   # Buffer of incomplete unrolls. Filled during inference with new transitions.
   # This only contains data from training environments.

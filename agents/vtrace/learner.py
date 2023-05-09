@@ -217,7 +217,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     elif "vln" in config.env:
       project = "vln"
     else:
-      raise NotImplementedError
+      project = 'debug'
     wandb.init(
       id=wandb_id,
       resume="allow",
