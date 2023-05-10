@@ -38,10 +38,10 @@ flags.DEFINE_list('policy_sizes', [], 'Sizes of each of policy MLP hidden layer.
 flags.DEFINE_list('value_sizes', [], 'Sizes of each of value MLP hidden layer.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
 flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
+flags.DEFINE_list('mlp_core_sizes', None, 'Sizes of each of value MLP (substitute for LSTM)')
 
 
 def create_agent(action_space, env_observation_space,
@@ -54,7 +54,8 @@ def create_agent(action_space, env_observation_space,
                              lang_key='none',
                              policy_sizes=[int(size) for size in FLAGS.policy_sizes],
                              value_sizes=[int(size) for size in FLAGS.value_sizes],
-                             obs_space=env_observation_space)
+                             obs_space=env_observation_space,
+                             mlp_core_sizes=[int(size) for size in FLAGS.mlp_core_sizes] if FLAGS.mlp_core_sizes else None)
 
 
 def create_optimizer(unused_final_iteration):
@@ -66,16 +67,17 @@ def create_optimizer(unused_final_iteration):
 
 
 def main(argv):
-  if len(argv) > 1:
-    raise app.UsageError('Too many command-line arguments.')
-  if FLAGS.run_mode == 'actor':
-    actor.actor_loop(env.create_environment)
-  elif FLAGS.run_mode == 'learner':
-    learner.learner_loop(env.create_environment,
-                         create_agent,
-                         create_optimizer)
-  else:
-    raise ValueError('Unsupported run mode {}'.format(FLAGS.run_mode))
+    if len(argv) > 1:
+        raise app.UsageError('Too many command-line arguments.')
+    create_env = lambda task, config: env.create_environment(task, config, dict_space=True)
+    if FLAGS.run_mode == 'actor':
+        actor.actor_loop(create_env)
+    elif FLAGS.run_mode == 'learner':
+        learner.learner_loop(create_env,
+                            create_agent,
+                            create_optimizer)
+    else:
+        raise ValueError('Unsupported run mode {}'.format(FLAGS.run_mode))
 
 
 if __name__ == '__main__':

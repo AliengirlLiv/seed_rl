@@ -18,10 +18,8 @@ import tempfile
 
 from absl import flags
 from absl import logging
-import atari_py  
 import gym
 from seed_rl.atari import atari_preprocessing
-from seed_rl.common import common_flags  
 
 
 FLAGS = flags.FLAGS
@@ -39,7 +37,7 @@ flags.DEFINE_boolean('sticky_actions', False,
                      'Machado et al. (2017).')
 
 
-def create_environment(task, config):  
+def create_environment(task, config, dict_space=False):  
   logging.info('Creating environment: %s', config.game)
 
 
@@ -54,4 +52,5 @@ def create_environment(task, config):
   return atari_preprocessing.AtariPreprocessing(
       env,
       frame_skip=config.num_action_repeats,
-      max_random_noops=config.max_random_noops)
+      max_random_noops=config.max_random_noops,
+      dict_space=dict_space)

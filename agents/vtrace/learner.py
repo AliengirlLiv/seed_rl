@@ -430,7 +430,6 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
           if i == 0:
             info_queue.enqueue_many(env_infos.read(done_ids))
           env_infos.reset(done_ids)
-          assert FLAGS.num_action_repeats == 1
           env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0., total_non_reading_frames * tf.cast(env_outputs.done, tf.int64), total_frames * tf.cast(env_outputs.done, tf.int64)))
 
           # Inference.

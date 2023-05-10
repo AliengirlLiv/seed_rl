@@ -139,7 +139,8 @@ class ImpalaDeep(tf.Module):
     # Parameters and layers for unroll.
     self._num_actions = num_actions
     self._use_lstm = lstm_size > 0
-    if not self._use_lstm:
+    self._uses_int_input = (obs_space['image'].high == 255).all()
+    if self._use_lstm:
       self._core = tf.keras.layers.LSTMCell(lstm_size)
     else:
       core_layers = []
@@ -187,7 +188,9 @@ class ImpalaDeep(tf.Module):
 
   def initial_state(self, batch_size):
     if not self._use_lstm:
-      return None
+      return AgentState(tf.zeros([batch_size, 0], dtype=tf.float32),
+                        frame_stacking_state=initial_frame_stacking_state(
+            self._stack_size, batch_size, self._observation_shape['image']))
     return AgentState(
         core_state=self._core.get_initial_state(
             batch_size=batch_size, dtype=tf.float32),
@@ -294,15 +297,16 @@ class ImpalaDeep(tf.Module):
   def _unroll(self, prev_actions, env_outputs, agent_state):
     unused_reward, done, observation, _, _ = env_outputs
 
-    torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
-
     initial_agent_state = self.initial_state(tf.shape(prev_actions)[1])
     stacked_frames, frame_state = stack_frames(
         observation['image'], agent_state.frame_stacking_state, done, self._stack_size)
 
-    observation['image'] = stacked_frames / 255
+    if self._uses_int_input:
+      stacked_frames = stacked_frames / 255
+    observation['image'] = stacked_frames
     env_outputs = env_outputs._replace(observation=observation)
     core_state = agent_state.core_state
+    torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
     
     if not self._use_lstm:
       core_outputs = utils.batch_apply(self._core, (torso_outputs,))

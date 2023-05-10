@@ -85,6 +85,10 @@ flags.DEFINE_integer('n_steps', 5,
                      'n-step returns: how far ahead we look for computing the '
                      'Bellman targets.')
 flags.DEFINE_float('discounting', .997, 'Discounting factor.')
+flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')
+flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
+flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
+
 
 # Eval settings
 flags.DEFINE_float('eval_epsilon', 1e-3,
@@ -498,6 +502,42 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   """
   logging.info('Starting learner loop')
   validate_config()
+  config = FLAGS
+  if config.use_wandb:
+    import wandb
+    import pathlib
+    logdir = pathlib.Path(FLAGS.logdir) / FLAGS.exp_name
+
+    wandb_id_file = f"{str(logdir)}/wandb_id.txt"
+    wandb_pa = pathlib.Path(wandb_id_file)
+    if wandb_pa.exists():
+      print("!! Resuming wandb run !!")
+      with open(wandb_id_file, "r") as f:
+        wandb_id = f.read().strip()
+    else:
+      logdir.mkdir(parents=True, exist_ok=True)
+      wandb_id = wandb.util.generate_id()
+      with open(wandb_id_file, "w") as f:
+        f.write(wandb_id)
+    if "homegrid" in config.env:
+      project = "homegridv3"
+    elif "messenger" in config.env:
+      project = "messenger"
+    elif "homecook" in config.env:
+      project = "homecook"
+    elif "vln" in config.env:
+      project = "vln"
+    else:
+      project = 'debug'
+    wandb.init(
+      id=wandb_id,
+      resume="allow",
+      project=project,
+      name=config.exp_name,
+      group=config.exp_name[:config.exp_name.rfind("_")],
+      sync_tensorboard=True,
+      config=config.flag_values_dict(),
+    )
   settings = utils.init_learner(FLAGS.num_training_tpus)
   strategy, inference_devices, training_strategy, encode, decode = settings
   env = create_env_fn(0, FLAGS)

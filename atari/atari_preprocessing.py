@@ -43,7 +43,7 @@ class AtariPreprocessing(object):
   """
 
   def __init__(self, environment, frame_skip=4, terminal_on_life_loss=False,
-               screen_size=84, max_random_noops=0):
+               screen_size=84, max_random_noops=0, dict_space=False):
     """Constructor for an Atari 2600 preprocessor.
 
     Args:
@@ -71,6 +71,7 @@ class AtariPreprocessing(object):
     self.frame_skip = frame_skip
     self.screen_size = screen_size
     self.max_random_noops = max_random_noops
+    self.dict_space = dict_space
 
     obs_dims = self.environment.observation_space
     # Stores temporary observations used for pooling over two successive
@@ -87,8 +88,11 @@ class AtariPreprocessing(object):
   def observation_space(self):
     # Return the observation space adjusted to match the shape of the processed
     # observations.
-    return {'image': Box(low=0, high=255, shape=(self.screen_size, self.screen_size, 1),
-               dtype=np.uint8)}
+    obs_box = Box(low=0, high=255, shape=(self.screen_size, self.screen_size, 1),
+               dtype=np.uint8)
+    if self.dict_space:
+      return {'image': obs_box}
+    return obs_box
 
   @property
   def action_space(self):
@@ -130,7 +134,10 @@ class AtariPreprocessing(object):
     self.lives = self.environment.ale.lives()
     self._fetch_grayscale_observation(self.screen_buffer[0])
     self.screen_buffer[1].fill(0)
-    return {'image': self._pool_and_resize()}
+    obs = self._pool_and_resize()
+    if self.dict_space:
+      return {'image': obs}
+    return obs
 
   def render(self, mode):
     """Renders the current screen, before preprocessing.
@@ -193,7 +200,9 @@ class AtariPreprocessing(object):
         self._fetch_grayscale_observation(self.screen_buffer[t])
 
     # Pool the last two observations.
-    observation = {'image': self._pool_and_resize()}
+    observation = self._pool_and_resize()
+    if self.dict_space:
+      observation = {'image': observation}
 
     self.game_over = game_over
     return observation, accumulated_reward, is_terminal, info
