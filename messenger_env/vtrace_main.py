@@ -55,7 +55,8 @@ def create_agent(action_space, env_observation_space,
                              vocab_size=env_observation_space['token'].high + 1,
                              lang_key=FLAGS.lang_key,
                              policy_sizes=[int(size) for size in FLAGS.policy_sizes],
-                             value_sizes=[int(size) for size in FLAGS.value_sizes])
+                             value_sizes=[int(size) for size in FLAGS.value_sizes],
+                             obs_space=env_observation_space)
 
 
 def create_optimizer(unused_final_iteration):

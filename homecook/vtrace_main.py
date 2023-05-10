@@ -68,7 +68,8 @@ def create_agent(action_space, env_observation_space,
                              vocab_size=env_observation_space['token'].high + 1,
                              lang_key=FLAGS.lang_key,
                              policy_sizes=[int(size) for size in FLAGS.policy_sizes],
-                             value_sizes=[int(size) for size in FLAGS.value_sizes])
+                             value_sizes=[int(size) for size in FLAGS.value_sizes],
+                             obs_space=env_observation_space)
 
 
 def create_optimizer(unused_final_iteration):
@@ -95,7 +96,7 @@ def main(argv):
     repeat_task_every=FLAGS.repeat_task_every,
     preread_max=FLAGS.preread_max,
     p_language=FLAGS.p_language,
-    lang_types=['task'],
+    lang_types=FLAGS.lang_types,
   )
 
   if len(argv) > 1:
