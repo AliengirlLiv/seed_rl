@@ -18,6 +18,7 @@ import collections
 from seed_rl.common import utils
 import tensorflow as tf
 from seed_rl.dmlab.networks import _Stack
+from seed_rl.atari.networks import stack_frames, AgentState, initial_frame_stacking_state
 
 AgentOutput = collections.namedtuple('AgentOutput',
                                      'action policy_logits baseline')
@@ -131,7 +132,8 @@ class ImpalaDeep(tf.Module):
   by Espeholt, Soyer, Munos et al.
   """
 
-  def __init__(self, num_actions, mlp_sizes=(64,), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token', lstm_size=256, policy_sizes=(), value_sizes=()):
+  def __init__(self, num_actions, mlp_sizes=(64,), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token',
+               lstm_size=256, policy_sizes=(), value_sizes=(), stack_size=1, obs_space=None):
     super(ImpalaDeep, self).__init__(name='impala_deep')
 
     # Parameters and layers for unroll.
@@ -146,6 +148,8 @@ class ImpalaDeep(tf.Module):
         mlp_layers.append(tf.keras.layers.Swish())
         mlp_layers.append(tf.keras.layers.LayerNormalization())
     self._mlp = tf.keras.Sequential(mlp_layers)
+    self._stack_size = stack_size
+    self._observation_shape = obs_space
 
     # Parameters and layers for _torso.
     self._stacks = [
@@ -172,7 +176,12 @@ class ImpalaDeep(tf.Module):
     self._baseline = tf.keras.Sequential(layer_list)
 
   def initial_state(self, batch_size):
-    return self._core.get_initial_state(batch_size=batch_size, dtype=tf.float32)
+    # return self._core.get_initial_state(batch_size=batch_size, dtype=tf.float32)
+    return AgentState(
+        core_state=self._core.get_initial_state(
+            batch_size=batch_size, dtype=tf.float32),
+        frame_stacking_state=initial_frame_stacking_state(
+            self._stack_size, batch_size, self._observation_shape['image']))
 
   def _torso(self, prev_action, env_output):
     reward, _, obs, _, _ = env_output
@@ -192,12 +201,16 @@ class ImpalaDeep(tf.Module):
     conv_out = self._conv_to_linear(conv_out)
     conv_out = tf.nn.relu(conv_out)
     
-    token = obs[self._lang_key]
     if self._lang_key == 'token':
       # One-hot encoding
+      token = obs[self._lang_key]
       token = tf.cast(token, tf.int32)
       token = tf.one_hot(token, self._vocab_size)
-    lang = self._mlp(token)
+    elif not self._lang_key == 'none':
+      token = obs[self._lang_key]
+      lang = self._mlp(token)
+    else:
+      lang = tf.zeros((conv_out.shape[0], 0), dtype=tf.float32)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)
@@ -245,42 +258,51 @@ class ImpalaDeep(tf.Module):
         
     # Compute the number of parameters
     import numpy as np
-    num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
+    try:
+      num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
 
-    # Print the number of parameters
-    print("!"* 1000)
-    print(f'Total number of parameters: {num_params}')
-    if hasattr(self, '_embedding'):
-      print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
-    print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
-    if hasattr(self, '_mlp'):
-      print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
-    print(f'Number of cnn params: {sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
-    print(f'Number of conv_to_linear params: {sum([np.prod(v.shape) for v in self._conv_to_linear.trainable_variables])}')
-    print(f'Number of policy_logits params: {sum([np.prod(v.shape) for v in self._policy_logits.trainable_variables])}')
-    print(f'Number of baseline params: {sum([np.prod(v.shape) for v in self._baseline.trainable_variables])}')
-    if hasattr(self, '_embedding'):
-      print(f'Number of params not in embedding: {num_params - sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+      # Print the number of parameters
+      print("!"* 1000)
+      print(f'Total number of parameters: {num_params}')
+      if hasattr(self, '_embedding'):
+        print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+      print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
+      if hasattr(self, '_mlp'):
+        print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
+      print(f'Number of cnn params: {sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
+      print(f'Number of conv_to_linear params: {sum([np.prod(v.shape) for v in self._conv_to_linear.trainable_variables])}')
+      print(f'Number of policy_logits params: {sum([np.prod(v.shape) for v in self._policy_logits.trainable_variables])}')
+      print(f'Number of baseline params: {sum([np.prod(v.shape) for v in self._baseline.trainable_variables])}')
+      if hasattr(self, '_embedding'):
+        print(f'Number of params not in embedding: {num_params - sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+    except Exception as e:
+      print(f'Error printing param count: {e}')
 
     return outputs, core_state
 
-  def _unroll(self, prev_actions, env_outputs, core_state):
-    unused_reward, done, unused_observation, _, _ = env_outputs
+  def _unroll(self, prev_actions, env_outputs, agent_state):
+    unused_reward, done, observation, _, _ = env_outputs
 
     torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
 
-    initial_core_state = self._core.get_initial_state(
-        batch_size=tf.shape(prev_actions)[1], dtype=tf.float32)
+    initial_agent_state = self.initial_state(tf.shape(prev_actions)[1])
+    stacked_frames, frame_state = stack_frames(
+        observation['image'], agent_state.frame_stacking_state, done, self._stack_size)
+
+    observation['image'] = stacked_frames / 255
+    env_outputs = env_outputs._replace(observation=observation)
+    core_state = agent_state.core_state
+    
     core_output_list = []
     for input_, d in zip(tf.unstack(torso_outputs), tf.unstack(done)):
       # If the episode ended, the core state should be reset before the next.
       core_state = tf.nest.map_structure(
           lambda x, y, d=d: tf.where(  
               tf.reshape(d, [d.shape[0]] + [1] * (x.shape.rank - 1)), x, y),
-          initial_core_state,
+          initial_agent_state.core_state,
           core_state)
       core_output, core_state = self._core(input_, core_state)
       core_output_list.append(core_output)
     core_outputs = tf.stack(core_output_list)
 
-    return utils.batch_apply(self._head, (core_outputs,)), core_state
+    return utils.batch_apply(self._head, (core_outputs,)), AgentState(core_state, frame_state)

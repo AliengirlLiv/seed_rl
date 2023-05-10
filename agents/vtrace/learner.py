@@ -32,7 +32,7 @@ from seed_rl.common.parametric_distribution import get_parametric_distribution_f
 import tensorflow as tf
 
 
-
+FLAGS = flags.FLAGS
 
 # Training.
 flags.DEFINE_integer('save_checkpoint_secs', 1800,
@@ -66,7 +66,7 @@ flags.DEFINE_integer('log_batch_frequency', 100, 'We average that many batches '
                      'before logging batch statistics like entropy.')
 flags.DEFINE_integer('log_episode_frequency', 1, 'We average that many episodes'
                      ' before logging average episode return and length.')
-flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')  # TODO: change to False by default for debugging?
+flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')
 flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
 
@@ -405,7 +405,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
             tf.print('Environment ids needing reset:', envs_needing_reset)
           env_infos.reset(envs_needing_reset)
           total_frames.assign_add(FLAGS.inference_batch_size)
-          reading = env_outputs.observation['is_read_step']
+          # reading = env_outputs.observation['is_read_step']
+          reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
           total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
           store.reset(envs_needing_reset)
           initial_agent_states = agent.initial_state(

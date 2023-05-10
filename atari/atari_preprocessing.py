@@ -87,8 +87,8 @@ class AtariPreprocessing(object):
   def observation_space(self):
     # Return the observation space adjusted to match the shape of the processed
     # observations.
-    return Box(low=0, high=255, shape=(self.screen_size, self.screen_size, 1),
-               dtype=np.uint8)
+    return {'image': Box(low=0, high=255, shape=(self.screen_size, self.screen_size, 1),
+               dtype=np.uint8)}
 
   @property
   def action_space(self):
@@ -130,7 +130,7 @@ class AtariPreprocessing(object):
     self.lives = self.environment.ale.lives()
     self._fetch_grayscale_observation(self.screen_buffer[0])
     self.screen_buffer[1].fill(0)
-    return self._pool_and_resize()
+    return {'image': self._pool_and_resize()}
 
   def render(self, mode):
     """Renders the current screen, before preprocessing.
@@ -193,7 +193,7 @@ class AtariPreprocessing(object):
         self._fetch_grayscale_observation(self.screen_buffer[t])
 
     # Pool the last two observations.
-    observation = self._pool_and_resize()
+    observation = {'image': self._pool_and_resize()}
 
     self.game_over = game_over
     return observation, accumulated_reward, is_terminal, info

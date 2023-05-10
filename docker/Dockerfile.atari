@@ -42,7 +42,7 @@ RUN pip3 install atari-py
 RUN pip3 install opencv-python
 
 RUN pip3 install tensorflow_probability==0.11.0 absl-py==0.10 google protobuf==3.20.1 tensorflow==2.4.1 
-RUN pip3 install typing_extensions==4.0
+RUN pip3 install typing_extensions==4.0 wandb
 
 
 RUN mkdir roms && \
