@@ -39,7 +39,7 @@ flags.DEFINE_list('policy_sizes', [], 'Sizes of each of policy MLP hidden layer.
 flags.DEFINE_list('value_sizes', [], 'Sizes of each of value MLP hidden layer.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
 
