@@ -52,7 +52,7 @@ flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
 flags.DEFINE_integer('preread_max', -1, 'Preread max.')
 flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 

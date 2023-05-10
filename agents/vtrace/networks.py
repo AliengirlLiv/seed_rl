@@ -201,16 +201,16 @@ class ImpalaDeep(tf.Module):
     conv_out = self._conv_to_linear(conv_out)
     conv_out = tf.nn.relu(conv_out)
     
-    if self._lang_key == 'token':
-      # One-hot encoding
-      token = obs[self._lang_key]
-      token = tf.cast(token, tf.int32)
-      token = tf.one_hot(token, self._vocab_size)
-    elif not self._lang_key == 'none':
-      token = obs[self._lang_key]
-      lang = self._mlp(token)
-    else:
+    
+    if self._lang_key == 'none':
       lang = tf.zeros((conv_out.shape[0], 0), dtype=tf.float32)
+    else:
+      token = obs[self._lang_key]
+      if self._lang_key == 'token':
+        # One-hot encoding
+        token = tf.cast(token, tf.int32)
+        token = tf.one_hot(token, self._vocab_size)
+      lang = self._mlp(token)
     
     # Append clipped last reward and one hot last action.
     clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)
