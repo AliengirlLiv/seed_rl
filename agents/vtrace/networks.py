@@ -145,7 +145,7 @@ class ImpalaDeep(tf.Module):
     for i, size in enumerate(mlp_sizes):
       mlp_layers.append(tf.keras.layers.Dense(size, None))
       if i < len(mlp_sizes) - 1:
-        mlp_layers.append(tf.keras.layers.Swish())
+        mlp_layers.append(tf.keras.Activation(tf.keras.activations.swish))
         mlp_layers.append(tf.keras.layers.LayerNormalization())
     self._mlp = tf.keras.Sequential(mlp_layers)
     self._stack_size = stack_size
@@ -162,7 +162,7 @@ class ImpalaDeep(tf.Module):
     layer_list = []
     for size in policy_sizes:
       layer_list.append(tf.keras.layers.Dense(size, None))
-      layer_list.append(tf.keras.layers.Swish())
+      layer_list.append(tf.keras.Activation(tf.keras.activations.swish))
       layer_list.append(tf.keras.layers.LayerNormalization())
     layer_list.append(tf.keras.layers.Dense(self._num_actions, name='policy_logits'))
     self._policy_logits = tf.keras.Sequential(layer_list)
@@ -170,7 +170,7 @@ class ImpalaDeep(tf.Module):
     layer_list = []
     for size in value_sizes:
       layer_list.append(tf.keras.layers.Dense(size, None))
-      layer_list.append(tf.keras.layers.Swish())
+      layer_list.append(tf.keras.Activation(tf.keras.activations.swish))
       layer_list.append(tf.keras.layers.LayerNormalization())
     layer_list.append(tf.keras.layers.Dense(1, name='baseline'))
     self._baseline = tf.keras.Sequential(layer_list)
