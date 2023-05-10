@@ -145,7 +145,7 @@ class ImpalaDeep(tf.Module):
     for i, size in enumerate(mlp_sizes):
       mlp_layers.append(tf.keras.layers.Dense(size, None))
       if i < len(mlp_sizes) - 1:
-        mlp_layers.append(tf.keras.Activation(tf.keras.activations.swish))
+        mlp_layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
         mlp_layers.append(tf.keras.layers.LayerNormalization())
     self._mlp = tf.keras.Sequential(mlp_layers)
     self._stack_size = stack_size
