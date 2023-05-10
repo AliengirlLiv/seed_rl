@@ -405,7 +405,6 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
             tf.print('Environment ids needing reset:', envs_needing_reset)
           env_infos.reset(envs_needing_reset)
           total_frames.assign_add(FLAGS.inference_batch_size)
-          # reading = env_outputs.observation['is_read_step']
           reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
           total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
           store.reset(envs_needing_reset)
@@ -524,6 +523,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   logger.start(additional_logs)
   # Execute learning.
   while iterations < final_iteration:
+    print('ITERATIONS', iterations)
     # Save checkpoint.
     current_time = time.time()
     if current_time - last_ckpt_time >= FLAGS.save_checkpoint_secs:
