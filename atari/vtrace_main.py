@@ -58,9 +58,11 @@ def create_agent(action_space, env_observation_space,
 
 
 def create_optimizer(unused_final_iteration):
-  learning_rate_fn = lambda iteration: FLAGS.learning_rate
-  optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
-  return optimizer, learning_rate_fn
+    # learning_rate_fn = lambda iteration: FLAGS.learning_rate
+    #   optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
+    learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(FLAGS.learning_rate, FLAGS.total_environment_frames, 0)
+    optimizer = tf.keras.optimizers.RMSprop(FLAGS.learning_rate, momentum=0, epsilon=0.01)
+    return optimizer, learning_rate_fn
 
 
 def main(argv):

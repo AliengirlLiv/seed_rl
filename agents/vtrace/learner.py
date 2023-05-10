@@ -69,6 +69,7 @@ flags.DEFINE_integer('log_episode_frequency', 1, 'We average that many episodes'
 flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')
 flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
+flags.DEFINE_float('clip_norm', None, 'We clip gradient norm to this value.')
 
 FLAGS = flags.FLAGS
 
@@ -304,6 +305,10 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         loss, logs = compute_loss(logger, parametric_action_distribution, agent,
                                   *args)
       grads = tape.gradient(loss, agent.trainable_variables)
+      gradient_norm_before_clip = tf.linalg.global_norm(grads)
+      if FLAGS.clip_norm is not None:
+        grads, _ = tf.clip_by_global_norm(
+            grads, FLAGS.clip_norm, use_norm=gradient_norm_before_clip)
       for t, g in zip(temp_grads, grads):
         t.assign(g)
       return loss, logs

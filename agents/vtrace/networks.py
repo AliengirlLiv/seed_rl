@@ -133,12 +133,22 @@ class ImpalaDeep(tf.Module):
   """
 
   def __init__(self, num_actions, mlp_sizes=(64,), cnn_sizes=(16, 32, 32), vocab_size=32100, lang_key='token',
-               lstm_size=256, policy_sizes=(), value_sizes=(), stack_size=1, obs_space=None):
+               lstm_size=256, policy_sizes=(), value_sizes=(), stack_size=1, obs_space=None, mlp_core_sizes=None):
     super(ImpalaDeep, self).__init__(name='impala_deep')
 
     # Parameters and layers for unroll.
     self._num_actions = num_actions
-    self._core = tf.keras.layers.LSTMCell(lstm_size)
+    self._use_lstm = lstm_size > 0
+    if not self._use_lstm:
+      self._core = tf.keras.layers.LSTMCell(lstm_size)
+    else:
+      core_layers = []
+      for i, size in enumerate(mlp_core_sizes):
+        core_layers.append(tf.keras.layers.Dense(size, None))
+        if i < len(mlp_core_sizes) - 1:
+          core_layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+          core_layers.append(tf.keras.layers.LayerNormalization())
+      self._core = tf.keras.Sequential(core_layers)
     self._lang_key = lang_key
     self._vocab_size = vocab_size
     mlp_layers = []
@@ -176,7 +186,8 @@ class ImpalaDeep(tf.Module):
     self._baseline = tf.keras.Sequential(layer_list)
 
   def initial_state(self, batch_size):
-    # return self._core.get_initial_state(batch_size=batch_size, dtype=tf.float32)
+    if not self._use_lstm:
+      return None
     return AgentState(
         core_state=self._core.get_initial_state(
             batch_size=batch_size, dtype=tf.float32),
@@ -266,7 +277,7 @@ class ImpalaDeep(tf.Module):
       print(f'Total number of parameters: {num_params}')
       if hasattr(self, '_embedding'):
         print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
-      print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
+      print(f'Number of {"lstm" if self._use_lstm else "mlp core"} params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
       if hasattr(self, '_mlp'):
         print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
       print(f'Number of cnn params: {sum([sum([np.prod(v.shape) for v in s.trainable_variables]) for s in self._stacks])}')
@@ -293,16 +304,19 @@ class ImpalaDeep(tf.Module):
     env_outputs = env_outputs._replace(observation=observation)
     core_state = agent_state.core_state
     
-    core_output_list = []
-    for input_, d in zip(tf.unstack(torso_outputs), tf.unstack(done)):
-      # If the episode ended, the core state should be reset before the next.
-      core_state = tf.nest.map_structure(
-          lambda x, y, d=d: tf.where(  
-              tf.reshape(d, [d.shape[0]] + [1] * (x.shape.rank - 1)), x, y),
-          initial_agent_state.core_state,
-          core_state)
-      core_output, core_state = self._core(input_, core_state)
-      core_output_list.append(core_output)
-    core_outputs = tf.stack(core_output_list)
+    if not self._use_lstm:
+      core_outputs = utils.batch_apply(self._core, (torso_outputs,))
+    else:
+      core_output_list = []
+      for input_, d in zip(tf.unstack(torso_outputs), tf.unstack(done)):
+        # If the episode ended, the core state should be reset before the next.
+        core_state = tf.nest.map_structure(
+            lambda x, y, d=d: tf.where(
+                tf.reshape(d, [d.shape[0]] + [1] * (x.shape.rank - 1)), x, y),
+            initial_agent_state.core_state,
+            core_state)
+        core_output, core_state = self._core(input_, core_state)
+        core_output_list.append(core_output)
+      core_outputs = tf.stack(core_output_list)
 
     return utils.batch_apply(self._head, (core_outputs,)), AgentState(core_state, frame_state)
