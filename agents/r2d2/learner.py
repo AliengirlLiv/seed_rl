@@ -914,9 +914,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
               r, n, env_id,
               'training' if is_training else 'eval',
               iterations.numpy())
-          if not is_training:
-            tf.summary.scalar('eval/episode_return', r)
-            tf.summary.scalar('eval/episode_frames', n)
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_return", r)
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_frames", n)
       log_future.result()  # Raise exception if any occurred in logging.
       log_future = executor.submit(log, num_env_frames)
 
