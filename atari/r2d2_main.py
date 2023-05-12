@@ -44,7 +44,7 @@ flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
 
 def create_agent(env_observation_space, num_actions):
   return networks.DuelingLSTMDQNNet(
-      num_actions, env_observation_space, FLAGS.stack_size)
+      num_actions, env_observation_space, FLAGS.stack_size, lang_key='none')
 
 
 def create_optimizer(unused_final_iteration):
