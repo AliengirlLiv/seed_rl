@@ -88,7 +88,9 @@ def stack_frames(frames, frame_stacking_state, done, stack_size):
   if stack_size > 4:
     raise ValueError('Only up to stack size 4 is supported due to bit-packing.')
   if stack_size > 1 and frames.shape[-1] != 1:
-    raise ValueError('Due to frame stacking, we require last observation '
+      print('STACK SIZE', stack_size)
+      print('FRAMES', frames.shape)
+      raise ValueError('Due to frame stacking, we require last observation '
                      'dimension to be 1. Got {}'.format(frames.shape[-1]))
   if stack_size == 1:
     return frames, ()
@@ -386,6 +388,7 @@ class DuelingLSTMDQNNet(tf.Module):
     # [time, batch_size, <field shape>]
     unused_reward, done, observation, _, _ = env_outputs
     image = observation['image']
+    print('IMAGE SHAPE IN NETWORK', image.shape, "%" * 1000)
     image = tf.cast(image, tf.float32)
 
     initial_agent_state = self.initial_state(batch_size=tf.shape(done)[1])
