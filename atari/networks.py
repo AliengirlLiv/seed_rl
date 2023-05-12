@@ -234,6 +234,7 @@ class DuelingLSTMDQNNet(tf.Module):
                vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256):
     super(DuelingLSTMDQNNet, self).__init__(name='dueling_lstm_dqn_net')
     self._num_actions = num_actions
+    self._uses_int_input = (observation_space['image'].high == 255).all()
     layer_list = []
     assert len(cnn_sizes) == len(cnn_strides) == len(cnn_kernels)
     for size, stride, kernel in zip(cnn_sizes, cnn_strides, cnn_kernels):
@@ -397,7 +398,9 @@ class DuelingLSTMDQNNet(tf.Module):
     
     # Make a tensorflow copy of the observation
     observation = {k: tf.identity(v) for k, v in observation.items()}
-    observation['image'] = stacked_frames / 255
+    if self._uses_int_input:
+      stacked_frames = stacked_frames / 255
+    observation['image'] = stacked_frames
     env_outputs = env_outputs._replace(observation=observation)
     # [time, batch_size, torso_output_size]
     torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
