@@ -61,7 +61,7 @@ def main(argv):
   if FLAGS.run_mode == 'actor':
     actor.actor_loop(create_env)
   elif FLAGS.run_mode == 'learner':
-    learner.learner_loop(env.create_env,
+    learner.learner_loop(create_env,
                          create_agent,
                          create_optimizer)
   else:
