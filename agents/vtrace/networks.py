@@ -303,6 +303,7 @@ class ImpalaDeep(tf.Module):
 
     if self._uses_int_input:
       stacked_frames = stacked_frames / 255
+    observation = {k: tf.identity(v) for k, v in observation.items()}
     observation['image'] = stacked_frames
     env_outputs = env_outputs._replace(observation=observation)
     core_state = agent_state.core_state

@@ -388,14 +388,15 @@ class DuelingLSTMDQNNet(tf.Module):
     # [time, batch_size, <field shape>]
     unused_reward, done, observation, _, _ = env_outputs
     image = observation['image']
-    print('IMAGE SHAPE IN NETWORK', image.shape, "%" * 1000)
     image = tf.cast(image, tf.float32)
 
     initial_agent_state = self.initial_state(batch_size=tf.shape(done)[1])
 
     stacked_frames, frame_state = stack_frames(
         image, agent_state.frame_stacking_state, done, self._stack_size)
-
+    
+    # Make a tensorflow copy of the observation
+    observation = {k: tf.identity(v) for k, v in observation.items()}
     observation['image'] = stacked_frames / 255
     env_outputs = env_outputs._replace(observation=observation)
     # [time, batch_size, torso_output_size]
