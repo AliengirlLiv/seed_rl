@@ -57,10 +57,11 @@ def create_optimizer(unused_final_iteration):
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
+  create_env = lambda task, config: env.create_environment(task, config, dict_space=True)
   if FLAGS.run_mode == 'actor':
-    actor.actor_loop(env.create_environment)
+    actor.actor_loop(create_env)
   elif FLAGS.run_mode == 'learner':
-    learner.learner_loop(env.create_environment,
+    learner.learner_loop(env.create_env,
                          create_agent,
                          create_optimizer)
   else:

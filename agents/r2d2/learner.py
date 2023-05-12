@@ -86,7 +86,7 @@ flags.DEFINE_integer('n_steps', 5,
                      'Bellman targets.')
 flags.DEFINE_float('discounting', .997, 'Discounting factor.')
 flags.DEFINE_integer('use_wandb', 1, 'Whether to use wandb.')
-flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
+flags.DEFINE_string('env', 'homecook', 'Environment.')
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
 
 
