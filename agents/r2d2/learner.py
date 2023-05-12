@@ -85,7 +85,7 @@ flags.DEFINE_integer('n_steps', 5,
                      'n-step returns: how far ahead we look for computing the '
                      'Bellman targets.')
 flags.DEFINE_float('discounting', .997, 'Discounting factor.')
-flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')
+flags.DEFINE_integer('use_wandb', 0, 'Whether to use wandb.')
 flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
 
@@ -111,7 +111,7 @@ EpisodeInfo = collections.namedtuple(
     # returns: Sum of undiscounted rewards experienced in the episode.
     # raw_returns: Sum of raw rewards experienced in the episode.
     # env_ids: ID of the environment that generated this episode.
-    'num_frames returns raw_returns env_ids')
+    'num_frames returns raw_returns non_reading, total_frames, env_ids')
 
 
 def get_replay_insertion_batch_size(per_replica=False):
@@ -503,7 +503,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   logging.info('Starting learner loop')
   validate_config()
   config = FLAGS
-  if config.use_wandb:
+  if config.use_wandb == 1:
     import wandb
     import pathlib
     logdir = pathlib.Path(FLAGS.logdir) / FLAGS.exp_name
@@ -541,11 +541,11 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   settings = utils.init_learner(FLAGS.num_training_tpus)
   strategy, inference_devices, training_strategy, encode, decode = settings
   env = create_env_fn(0, FLAGS)
+  obs_shape = {k: tf.TensorSpec(env.observation_space[k].shape, env.observation_space[k].dtype, k) for k in env.observation_space}
   env_output_specs = utils.EnvOutput(
       tf.TensorSpec([], tf.float32, 'reward'),
       tf.TensorSpec([], tf.bool, 'done'),
-      tf.TensorSpec(env.observation_space.shape, env.observation_space.dtype,
-                    'observation'),
+      obs_shape,
       tf.TensorSpec([], tf.bool, 'abandoned'),
       tf.TensorSpec([], tf.int32, 'episode_step'),
   )
@@ -554,8 +554,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   agent_input_specs = (action_specs, env_output_specs)
 
   # Initialize agent and variables.
-  agent = create_agent_fn(env_output_specs, num_actions)
-  target_agent = create_agent_fn(env_output_specs, num_actions)
+  agent = create_agent_fn(env.observation_space, num_actions)
+  target_agent = create_agent_fn(env.observation_space, num_actions)
   initial_agent_state = agent.initial_state(1)
   agent_state_specs = tf.nest.map_structure(
       lambda t: tf.TensorSpec(t.shape[1:], t.dtype), initial_agent_state)
@@ -693,6 +693,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     ckpt.restore(manager.latest_checkpoint).assert_consumed()
     last_ckpt_time = time.time()
 
+  total_frames = tf.Variable(0, dtype=tf.int64)
+  total_non_reading_frames = tf.Variable(0, dtype=tf.int64)
   server = grpc2.Server([FLAGS.server_address])
 
   # Buffer of incomplete unrolls. Filled during inference with new transitions.
@@ -707,6 +709,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       tf.TensorSpec([], tf.int64, 'episode_num_frames'),
       tf.TensorSpec([], tf.float32, 'episode_returns'),
       tf.TensorSpec([], tf.float32, 'episode_raw_returns'),
+      tf.TensorSpec([], tf.int64, 'total_non_reading_frames'),
+      tf.TensorSpec([], tf.int64, 'total_frames'),
   )
   env_infos = utils.Aggregator(FLAGS.num_envs, info_specs, 'env_infos')
 
@@ -777,6 +781,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     if tf.not_equal(tf.shape(envs_needing_reset)[0], 0):
       tf.print('Environments needing reset:', envs_needing_reset)
     env_infos.reset(envs_needing_reset)
+    total_frames.assign_add(FLAGS.inference_batch_size)
+    reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
+    total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
     store.reset(tf.gather(
         envs_needing_reset,
         tf.where(is_training_env(envs_needing_reset))[:, 0]))
@@ -791,12 +798,12 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         'Abandoned done states are not supported in R2D2.')
 
     # Update steps and return.
-    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards))
+    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, 0, 0))
     done_ids = tf.gather(env_ids, tf.where(env_outputs.done)[:, 0])
     done_episodes_info = env_infos.read(done_ids)
     info_queue.enqueue_many(EpisodeInfo(*(done_episodes_info + (done_ids,))))
     env_infos.reset(done_ids)
-    env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0.))
+    env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0., total_non_reading_frames * tf.cast(env_outputs.done, tf.int64), total_frames * tf.cast(env_outputs.done, tf.int64)))
 
     # Inference.
     prev_actions = actions.read(env_ids)
@@ -907,15 +914,17 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         summary_writer.set_as_default()
         tf.summary.experimental.set_step(num_env_frames)
         episode_info = info_queue.dequeue_many(info_queue.size())
-        for n, r, _, env_id in zip(*episode_info):
+        for n, r, _, non_reading, total_frames, env_id in zip(*episode_info):
           is_training = is_training_env(env_id)
           logging.info(
-              'Return: %f Frames: %i Env id: %i (%s) Iteration: %i',
-              r, n, env_id,
+              'Return: %f Frames: %i, Non reading: %i, Total frames: %i, Env id: %i (%s) Iteration: %i',
+              r, n, non_reading, total_frames, env_id,
               'training' if is_training else 'eval',
               iterations.numpy())
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_return", r)
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_frames", n)
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/total_frames", tf.reduce_max(total_frames))
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/non_reading_frames", tf.reduce_max(non_reading))
       log_future.result()  # Raise exception if any occurred in logging.
       log_future = executor.submit(log, num_env_frames)
 

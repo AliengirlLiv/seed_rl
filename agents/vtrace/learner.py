@@ -66,7 +66,7 @@ flags.DEFINE_integer('log_batch_frequency', 100, 'We average that many batches '
                      'before logging batch statistics like entropy.')
 flags.DEFINE_integer('log_episode_frequency', 1, 'We average that many episodes'
                      ' before logging average episode return and length.')
-flags.DEFINE_bool('use_wandb', True, 'Whether to use wandb.')
+flags.DEFINE_integer('use_wandb', 0, 'Whether to use wandb.')
 flags.DEFINE_string('env', 'homecook', 'Environment.')  # TODO: move these all to one config file?
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
 flags.DEFINE_float('clip_norm', None, 'We clip gradient norm to this value.')
@@ -193,7 +193,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   validate_config()
   
   config = FLAGS
-  if config.use_wandb:
+  if config.use_wandb == 1:
     import wandb
     import pathlib
     logdir = pathlib.Path(FLAGS.logdir) / FLAGS.exp_name

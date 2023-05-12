@@ -92,7 +92,7 @@ def main(argv):
     p_teleport=FLAGS.p_teleport,
     p_unsafe=FLAGS.p_unsafe,
     # lang wrapper config
-    language_obs="token_embeds",  # TODO: later, make the obs handle arbitrary keys and make this a flag
+    language_obs="token_embeds",
     repeat_task_every=FLAGS.repeat_task_every,
     preread_max=FLAGS.preread_max,
     p_language=FLAGS.p_language,

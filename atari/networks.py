@@ -227,30 +227,61 @@ class DuelingLSTMDQNNet(tf.Module):
   (https://openreview.net/pdf?id=r1lyTjAqYX), section Hyper parameters.
   """
 
-  def __init__(self, num_actions, observation_shape, stack_size=1):
+  def __init__(self, num_actions, observation_space, stack_size=1, lang_key='token',
+               mlp_sizes=(64,), cnn_sizes=(16, 32, 32), cnn_strides=(4, 2, 1), cnn_kernels=(8, 4, 3), 
+               vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256):
     super(DuelingLSTMDQNNet, self).__init__(name='dueling_lstm_dqn_net')
     self._num_actions = num_actions
-    self._body = tf.keras.Sequential([
-        tf.keras.layers.Conv2D(32, [8, 8], 4,
-                               padding='valid', activation='relu'),
-        tf.keras.layers.Conv2D(64, [4, 4], 2,
-                               padding='valid', activation='relu'),
-        tf.keras.layers.Conv2D(64, [3, 3], 1,
-                               padding='valid', activation='relu'),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(512, activation='relu'),
-    ])
-    self._value = tf.keras.Sequential([
-        tf.keras.layers.Dense(512, activation='relu', name='hidden_value'),
-        tf.keras.layers.Dense(1, name='value_head'),
-    ])
-    self._advantage = tf.keras.Sequential([
-        tf.keras.layers.Dense(512, activation='relu', name='hidden_advantage'),
-        tf.keras.layers.Dense(self._num_actions, use_bias=False,
-                              name='advantage_head'),
-    ])
-    self._core = tf.keras.layers.LSTMCell(512)
-    self._observation_shape = observation_shape
+    layer_list = []
+    assert len(cnn_sizes) == len(cnn_strides) == len(cnn_kernels)
+    for size, stride, kernel in zip(cnn_sizes, cnn_strides, cnn_kernels):
+      layer_list.append(tf.keras.layers.Conv2D(size, [kernel, kernel], stride,
+                                               padding='valid', activation='relu'))
+    layer_list.append(tf.keras.layers.Flatten())
+    layer_list.append(tf.keras.layers.Dense(512, activation='relu'))
+    
+    self._body = tf.keras.Sequential(layer_list)
+    if value_sizes is None:
+      self._value = tf.keras.Sequential([
+          tf.keras.layers.Dense(512, activation='relu', name='hidden_value'),
+          tf.keras.layers.Dense(1, name='value_head'),
+      ])
+    else:
+      layer_list = []
+      for size in value_sizes:
+        layer_list.append(tf.keras.layers.Dense(size, None))
+        layer_list.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+        layer_list.append(tf.keras.layers.LayerNormalization())
+      layer_list.append(tf.keras.layers.Dense(1, name='baseline'))
+      self._value = tf.keras.Sequential(layer_list)
+    
+    if policy_sizes is None:
+      self._advantage = tf.keras.Sequential([
+          tf.keras.layers.Dense(512, activation='relu', name='hidden_advantage'),
+          tf.keras.layers.Dense(self._num_actions, use_bias=False,
+                                name='advantage_head'),
+      ])
+    else:
+      layer_list = []
+      for size in policy_sizes:
+        layer_list.append(tf.keras.layers.Dense(size, None))
+        layer_list.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+        layer_list.append(tf.keras.layers.LayerNormalization())
+      layer_list.append(tf.keras.layers.Dense(self._num_actions, name='advantage_head', use_bias=False))
+      self._advantage = tf.keras.Sequential(layer_list)
+    
+    self._core = tf.keras.layers.LSTMCell(lstm_size)
+    self._lang_key = lang_key
+    self._vocab_size = vocab_size
+    if not lang_key == 'none':
+      mlp_layers = []
+      for i, size in enumerate(mlp_sizes):
+        mlp_layers.append(tf.keras.layers.Dense(size, None))
+        if i < len(mlp_sizes) - 1:
+          mlp_layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+          mlp_layers.append(tf.keras.layers.LayerNormalization())
+      self._mlp = tf.keras.Sequential(mlp_layers)
+    self._observation_space = observation_space
     self._stack_size = stack_size
 
   def initial_state(self, batch_size):
@@ -258,16 +289,30 @@ class DuelingLSTMDQNNet(tf.Module):
         core_state=self._core.get_initial_state(
             batch_size=batch_size, dtype=tf.float32),
         frame_stacking_state=initial_frame_stacking_state(
-            self._stack_size, batch_size, self._observation_shape))
+            self._stack_size, batch_size, self._observation_space['image'].shape))
 
   def _torso(self, prev_action, env_output):
     # [batch_size, output_units]
-    conv_out = self._body(env_output.observation)
+    obs = env_output.observation
+    image = obs['image']
+    conv_out = self._body(image)
+    
+    if self._lang_key == 'none':
+      lang = tf.zeros((conv_out.shape[0], 0), dtype=tf.float32)
+    else:
+      token = obs[self._lang_key]
+      if self._lang_key == 'token':
+        # One-hot encoding
+        token = tf.cast(token, tf.int32)
+        token = tf.one_hot(token, self._vocab_size)
+      lang = self._mlp(token)
+    
+    
     # [batch_size, num_actions]
     one_hot_prev_action = tf.one_hot(prev_action, self._num_actions)
     # [batch_size, torso_output_size]
     return tf.concat(
-        [conv_out, tf.expand_dims(env_output.reward, -1), one_hot_prev_action],
+        [conv_out, lang, tf.expand_dims(env_output.reward, -1), one_hot_prev_action],
         axis=1)
 
   def _head(self, core_output):
@@ -315,19 +360,41 @@ class DuelingLSTMDQNNet(tf.Module):
       # Remove time dimension.
       outputs = tf.nest.map_structure(lambda t: tf.squeeze(t, 0), outputs)
 
+    import numpy as np
+    try:
+      num_params = sum([np.prod(v.shape) for v in self.trainable_variables])
+
+      # Print the number of parameters
+      print("!"* 1000)
+      print(f'Total number of parameters: {num_params}')
+      if hasattr(self, '_embedding'):
+        print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+      print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
+      if hasattr(self, '_mlp'):
+        print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
+      print(f'Number of cnn params: {sum([np.prod(v.shape) for v in self._body.trainable_variables])}')
+      print(f'Number of policy_logits params: {sum([np.prod(v.shape) for v in self._advantage.trainable_variables])}')
+      print(f'Number of baseline params: {sum([np.prod(v.shape) for v in self._value.trainable_variables])}')
+      if hasattr(self, '_embedding'):
+        print(f'Number of params not in embedding: {num_params - sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
+    except Exception as e:
+      print(f'Error printing param count: {e}')
+
     return outputs, agent_state
 
   def _unroll(self, prev_actions, env_outputs, agent_state):
     # [time, batch_size, <field shape>]
     unused_reward, done, observation, _, _ = env_outputs
-    observation = tf.cast(observation, tf.float32)
+    image = observation['image']
+    image = tf.cast(image, tf.float32)
 
     initial_agent_state = self.initial_state(batch_size=tf.shape(done)[1])
 
     stacked_frames, frame_state = stack_frames(
-        observation, agent_state.frame_stacking_state, done, self._stack_size)
+        image, agent_state.frame_stacking_state, done, self._stack_size)
 
-    env_outputs = env_outputs._replace(observation=stacked_frames / 255)
+    observation['image'] = stacked_frames / 255
+    env_outputs = env_outputs._replace(observation=observation)
     # [time, batch_size, torso_output_size]
     torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
 
