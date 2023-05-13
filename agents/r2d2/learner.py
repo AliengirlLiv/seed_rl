@@ -54,6 +54,8 @@ flags.DEFINE_integer('inference_batch_size', -1,
                      'Batch size for inference, -1 for auto-tune.')
 flags.DEFINE_integer('unroll_length', 100, 'Unroll length in agent steps.')
 flags.DEFINE_integer('num_training_tpus', 1, 'Number of TPUs for training.')
+flags.DEFINE_string('init_checkpoint', None,
+                    'Path to the checkpoint used to initialize the agent.')
 flags.DEFINE_integer('update_target_every_n_step',
                      2500,
                      'Update the target network at this frequency (expressed '
@@ -682,11 +684,13 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       FLAGS.logdir, flush_millis=20000, max_queue=1000)
 
   # Setup checkpointing and restore checkpoint.
-
+  if FLAGS.init_checkpoint is not None:
+    tf.print('Loading initial checkpoint from %s...' % FLAGS.init_checkpoint)
+    ckpt.restore(FLAGS.init_checkpoint).assert_consumed()
   ckpt = tf.train.Checkpoint(
       agent=agent, target_agent=target_agent, optimizer=optimizer)
   manager = tf.train.CheckpointManager(
-      ckpt, FLAGS.logdir, max_to_keep=1, keep_checkpoint_every_n_hours=6)
+      ckpt, FLAGS.logdir, max_to_keep=1, keep_checkpoint_every_n_hours=1)
   last_ckpt_time = 0  # Force checkpointing of the initial model.
   if manager.latest_checkpoint:
     logging.info('Restoring checkpoint: %s', manager.latest_checkpoint)

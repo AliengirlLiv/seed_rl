@@ -335,7 +335,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     tf.print('Loading initial checkpoint from %s...' % FLAGS.init_checkpoint)
     ckpt.restore(FLAGS.init_checkpoint).assert_consumed()
   manager = tf.train.CheckpointManager(
-      ckpt, FLAGS.logdir, max_to_keep=1, keep_checkpoint_every_n_hours=6)
+      ckpt, FLAGS.logdir, max_to_keep=1, keep_checkpoint_every_n_hours=1)
   last_ckpt_time = 0  # Force checkpointing of the initial model.
   if manager.latest_checkpoint:
     logging.info('Restoring checkpoint: %s', manager.latest_checkpoint)
