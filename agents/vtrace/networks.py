@@ -201,10 +201,9 @@ class ImpalaDeep(tf.Module):
     reward, _, obs, _, _ = env_output
     frame = obs['image']
 
-    # Convert to floats.
-    frame = tf.cast(frame, tf.float32)
-
-    frame /= 255
+    # Confirm it's a float
+    assert frame.dtype == tf.float32, f'UH OH!!! frame.dtype={frame.dtype}'
+    
     conv_out = frame
     for stack in self._stacks:
       conv_out = stack(conv_out)
@@ -302,7 +301,7 @@ class ImpalaDeep(tf.Module):
         observation['image'], agent_state.frame_stacking_state, done, self._stack_size)
 
     if self._uses_int_input:
-      stacked_frames = stacked_frames / 255
+      stacked_frames = tf.cast(stacked_frames, tf.float32) / 255.0
     observation = {k: tf.identity(v) for k, v in observation.items()}
     observation['image'] = stacked_frames
     env_outputs = env_outputs._replace(observation=observation)
