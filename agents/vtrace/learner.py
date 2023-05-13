@@ -332,8 +332,27 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   # Setup checkpointing and restore checkpoint.
   ckpt = tf.train.Checkpoint(agent=agent, optimizer=optimizer)
   if FLAGS.init_checkpoint is not None:
-    tf.print('Loading initial checkpoint from %s...' % FLAGS.init_checkpoint)
-    ckpt.restore(FLAGS.init_checkpoint).assert_consumed()
+    # If the checkpoint name already contains ckpt-, we can just use it.
+    if (FLAGS.init_checkpoint).split('/')[-1].startswith('ckpt-'):
+      checkpoint_path = FLAGS.init_checkpoint
+    else:
+      # Find a file in the init_checkpoint directory which starts with 'ckpt-' and ends with '.index'.
+      possible_files = []
+      for f in tf.io.gfile.listdir(FLAGS.init_checkpoint):
+        if f.startswith('ckpt-') and f.endswith('.index'):
+          possible_files.append(os.path.join(FLAGS.init_checkpoint, f)[:-6])
+      if len(possible_files) == 0:
+        raise ValueError('No checkpoint file found in %s' %
+                        FLAGS.init_checkpoint)
+      if len(possible_files) > 1:
+        raise ValueError('More than one checkpoint file found in %s' %
+                        FLAGS.init_checkpoint)
+      checkpoint_path = possible_files[0]
+    tf.print('Loading initial checkpoint from %s...' % checkpoint_path)
+    ckpt.restore(checkpoint_path).assert_consumed()
+    # If we're restoring from checkpoint, we need to reset the optimizer's step
+    optimizer.iterations.assign(0)
+    
   manager = tf.train.CheckpointManager(
       ckpt, FLAGS.logdir, max_to_keep=1, keep_checkpoint_every_n_hours=1)
   last_ckpt_time = 0  # Force checkpointing of the initial model.
