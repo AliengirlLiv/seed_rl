@@ -19,6 +19,9 @@ Warning!!! This code uses DeepMind wrappers which differ from OpenAI gym
 wrappers and the results may not be comparable.
 """
 
+import sys  # TODO: find another way to make this work!!
+sys.path = ['/home/olivia/LangWorld/docker_seed', '/home/jessy/olivia/docker_seed', '/seed_rl'] + sys.path
+
 from absl import app
 from absl import flags
 
