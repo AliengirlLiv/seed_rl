@@ -345,8 +345,10 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         raise ValueError('No checkpoint file found in %s' %
                         FLAGS.init_checkpoint)
       if len(possible_files) > 1:
-        raise ValueError('More than one checkpoint file found in %s' %
-                        FLAGS.init_checkpoint)
+        # Choose the most recent checkpoint.
+        checkpoint_path = max(possible_files, key=os.path.getctime)
+        tf.print('Found multiple checkpoint files, choosing %s' %
+                  checkpoint_path)
       checkpoint_path = possible_files[0]
     tf.print('Loading initial checkpoint from %s...' % checkpoint_path)
     ckpt.restore(checkpoint_path).assert_consumed()
