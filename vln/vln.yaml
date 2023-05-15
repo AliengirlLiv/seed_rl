@@ -1,0 +1,6 @@
+BASE_TASK_CONFIG_PATH: /home/olivia/LangWorld/docker_seed/seed_rl/VLN_CE/habitat_extensions/config/vlnce_task.yaml
+TRAINER_NAME: dreamer
+ENV_NAME: VLNCEWaypointEnv
+SIMULATOR_GPU_IDS: [1]
+TORCH_GPU_ID: 1
+NUM_ENVIRONMENTS: 1

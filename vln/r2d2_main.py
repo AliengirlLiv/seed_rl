@@ -47,31 +47,23 @@ flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 flags.DEFINE_list('policy_sizes', None, 'Sizes of each of policy MLP hidden layer.')
 flags.DEFINE_list('value_sizes', None, 'Sizes of each of value MLP hidden layer.')
 
-flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
-# Environment settings.
-flags.DEFINE_integer('max_steps', 100, 'Number of steps per episode.')
-flags.DEFINE_integer('num_trashobjs', 2, 'Number of trash objects.')
-flags.DEFINE_integer('num_trashcans', 2, 'Number of trash cans.')
-flags.DEFINE_float('p_teleport', 0.05, 'Probability of teleportation.')  # not recognized??
-flags.DEFINE_float('p_unsafe', 0.0, 'Probability of unsafe.')
-flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
-flags.DEFINE_integer('preread_max', -1, 'Preread max.')
-flags.DEFINE_float('p_language', 0.2, 'p_language')
+flags.DEFINE_integer('stack_size', 1, 'Number of frames to stack.')  # TODO: have we been using a stack this whole time???
+# Environment settings
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
-flags.DEFINE_string('dataset', 'train', 'Dataset.')
-flags.DEFINE_bool('use_descriptions', False, 'Use descriptions.')
-flags.DEFINE_bool('use_depth', False, 'Use depth.')
+flags.DEFINE_string('dataset', 'train_parsed_ns_all_mips_all', 'Dataset.')
+flags.DEFINE_bool('use_descriptions', True, 'Use descriptions.')
+flags.DEFINE_bool('use_depth', True, 'Use depth.')
 flags.DEFINE_bool('use_stored_tokens', False, 'Use stored tokens.')
 flags.DEFINE_integer('size', 64, 'Size.')
 flags.DEFINE_string('mode', 'train', 'Mode.')
 flags.DEFINE_float('use_expert', 0., 'Use expert.')
 flags.DEFINE_float('min_use_expert', 0., 'Min use expert.')
 flags.DEFINE_integer('anneal_expert_eps', 0, 'Anneal expert eps.')
-flags.DEFINE_float('success_reward', 2.5, 'Success reward.')
-flags.DEFINE_float('early_stop_penalty', 0., 'Early stop penalty.')
+flags.DEFINE_float('success_reward', 1000, 'Success reward.')
+flags.DEFINE_float('early_stop_penalty', 10., 'Early stop penalty.')
 
 
 
@@ -104,12 +96,13 @@ def main(argv):
     tf.random.set_seed(FLAGS.seed)
     random.seed(FLAGS.seed)
     def create_environment(task, config): return env.create_environment(
-        task=task,
-        config=config,
+        dataset=FLAGS.dataset,
+        language_obs='token_embeds',
+        use_descriptions=FLAGS.use_descriptions,
         mode=FLAGS.mode,
         use_depth=FLAGS.use_depth,
         use_stored_tokens=FLAGS.use_stored_tokens,
-        size=FLAGS.size,
+        size=(FLAGS.size, FLAGS.size),
         use_expert=FLAGS.use_expert,
         min_use_expert=FLAGS.min_use_expert,
         anneal_expert_eps=FLAGS.anneal_expert_eps,

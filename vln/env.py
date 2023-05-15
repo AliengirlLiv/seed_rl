@@ -1,5 +1,9 @@
-import embodied
+from seed_rl import embodied
 import numpy as np
+
+import sys
+sys.path = ['/home/olivia/LangWorld/docker_seed/seed_rl/VLN_CE', '/home/olivia/LangWorld/docker_seed/seed_rl', '/home/olivia/LangWorld/dynalangv3'] + sys.path
+
 from VLN_CE.vlnce_baselines.common.env_utils import (
     construct_env,
 )
@@ -9,6 +13,7 @@ import os
 import random
 from PIL import Image, ImageFont, ImageDraw
 import pickle
+from gym import spaces
 
 
 class VLNEnv(embodied.Env):
@@ -101,45 +106,38 @@ class VLNEnv(embodied.Env):
       self.encoder = SentenceTransformer("all-distilroberta-v1").eval()
  
   @property
-  def obs_space(self):
-    spaces = {k :  embodied.Space(v.dtype, v.shape) for k,v in self._env.observation_space.items()}
+  def observation_space(self):
+    sp = self._env.observation_space
     new_space = {}
     # resize image
-    new_space['image'] = embodied.Space(dtype=spaces['rgb'].dtype, shape=self._size + (3,), low=np.zeros(self._size + (3,), dtype=np.int8), high=255 * np.ones(self._size + (3,), dtype=np.int8))
+    new_space['image'] = spaces.Box(dtype=sp['rgb'].dtype, shape=self._size + (3,), low=np.zeros(self._size + (3,), dtype=np.int8), high=255 * np.ones(self._size + (3,), dtype=np.int8))
     if self._use_depth:
       new_space['depth'] = new_space['image']
-
     if self._use_text:
       # use one field for instructions or description text
       if self._use_stored_tokens: 
-        new_space['token_embeds_all'] = embodied.Space(np.int, (200,)) # TODO: fix this arbitrary max length
-        # spaces.pop('descriptions')
-        # spaces.pop('instruction')
+        new_space['token_embeds_all'] = spaces.Box(np.int, (200,)) # TODO: fix this arbitrary max length
       else:
-        # spaces['instruction'] = embodied.Space(dtype=np.float32, shape=(self.lm_embed_size,), low=-np.inf, high=np.inf)
-        # spaces.pop('descriptions')
-        # spaces.pop('instruction')
-
         if self.language_obs == "token_embeds":
           new_space.update({
-            "token": embodied.Space(
-              low=0, high=32100,
-              shape=(),
-              dtype=np.uint32),
-            "token_embed": embodied.Space(
-              low=-np.inf, high=np.inf,
-              shape=(512,),
-              dtype=np.float32),
-            "is_read_step": embodied.Space(
-              low=np.array(False),
-              high=np.array(True),
-              shape=(),
-              dtype=bool,
-            )
+            "token": spaces.Box(
+          0, 32100,
+          shape=(),
+          dtype=np.int64),
+      "token_embed": spaces.Box(
+          -np.inf, np.inf,
+          shape=(512,),
+          dtype=np.float32),
+      "is_read_step": spaces.Box(
+        low=np.array(False),
+        high=np.array(True),
+        shape=(),
+        dtype=bool,
+      )
           })
         elif self.language_obs == "token_embeds_all":
           new_space.update({
-            "token_embeds_all": embodied.Space(
+            "token_embeds_all": spaces.Box(
               low=-np.inf, high=np.inf,
               shape=(768,),
               dtype=np.float32),
@@ -148,25 +146,11 @@ class VLNEnv(embodied.Env):
           raise NotImplementedError(self.language_obs)
 
 
-    new_space[f'log_{self._mode}_success'] = embodied.Space(np.float32)
-    new_space[f'log_{self._mode}_pl_success'] = embodied.Space(np.float32)
-    new_space[f'log_{self._mode}_oracle_success'] = embodied.Space(np.float32)
-    new_space[f'log_image'] = new_space['image']
-
-    new_space['reward'] = embodied.Space(np.float32)
-    new_space['is_last'] = embodied.Space(bool)
-    new_space['is_terminal'] = embodied.Space(bool)
-    new_space['is_first'] = embodied.Space(bool)
-    new_space['is_demo'] = embodied.Space(bool)
     return new_space
-
   @property
-  def act_space(self):
+  def action_space(self):
     self._disc_act_space = ['STOP', 'MOVE_FORWARD', 'TURN_LEFT', 'TURN_RIGHT']
-    return {
-        'action': embodied.Space(np.int32, (), 0, len(self._disc_act_space)),
-        'reset': embodied.Space(bool),
-    }
+    return spaces.Discrete(len(self._disc_act_space))
   
   def _embed(self, string):
     assert self.language_obs == "token_embeds" or \
@@ -215,52 +199,38 @@ class VLNEnv(embodied.Env):
 
     return depth
 
+  def reset(self):
+    self._num_eps += 1 
+    self._step = 0
+    self.read_step = 0
+    self.cur_text = ''
+    self.cur_text_type = 'instr'
+    self.tokens = [] # for logging
+    self._done = False
+    self.done_first_input = False
+    ob = self._env.reset()
+    self.prev_env_ob = ob
+
+    if self._num_eps < self._anneal_expert_eps:
+      self._expert_ep = np.random.rand() < self._use_expert - (self._use_expert - self._min_use_expert) / self._anneal_expert_eps * self._num_eps
+    elif self._min_use_expert == self._use_expert: 
+      self._expert_ep = np.random.rand() < self._use_expert
+    else:
+      self._expert_ep = np.random.rand() < self._min_use_expert
+
+    ob = self.format_obs(ob)
+    ob["is_read_step"] = not self.done_first_input
+    ob[f'log_{self._mode}_success'] = 0
+    ob[f'log_{self._mode}_pl_success'] = 0
+    ob[f'log_{self._mode}_oracle_success'] = 0
+
+    if self._expert_ep:
+      # need to get infos to get gt_actions
+      self.next_expert_ac = self.prev_env_ob['shortest_path_sensor'][0]
+    
+    return ob
+
   def step(self, action):
-    if self._done or action['reset']:
-      self._num_eps += 1 
-      self._step = 0
-      self.read_step = 0
-      self.cur_text = ''
-      self.cur_text_type = 'instr'
-      self.tokens = [] # for logging
-      self._done = False
-      self.done_first_input = False
-      ob = self._env.reset()
-      self.prev_env_ob = ob
-
-      if self._num_eps < self._anneal_expert_eps:
-        self._expert_ep = np.random.rand() < self._use_expert - (self._use_expert - self._min_use_expert) / self._anneal_expert_eps * self._num_eps
-      elif self._min_use_expert == self._use_expert: 
-        self._expert_ep = np.random.rand() < self._use_expert
-      else:
-        self._expert_ep = np.random.rand() < self._min_use_expert
- 
-      log_traj_id = ob['instruction']['trajectory_id']
-      ob = self.format_obs(ob)
-      ob['reward'] = 0
-      ob['is_first'] = True
-      ob['is_last'] = self._done
-      ob['is_terminal'] = False
-      ob[f'log_{self._mode}_success'] = 0
-      ob[f'log_{self._mode}_pl_success'] = 0
-      ob[f'log_{self._mode}_oracle_success'] = 0
-      # print(f'log_image')
-      ob[f'log_image'] = self.render_with_text(ob, self.cur_text, log_traj_id, self._disc_act_space[action['action']])
-      ob[f'log_language_info'] = self.cur_text
-      ob["is_read_step"] = not self.done_first_input
-      ob["is_demo"] = self._expert_ep
-
-      if self._expert_ep:
-        # need to get infos to get gt_actions
-        self.next_expert_ac = self.prev_env_ob['shortest_path_sensor'][0]
-        ob["next_expert_ac"] = self.next_expert_ac
-      else:
-        ob["next_expert_ac"] = -1
-      
-      
-      return ob
-
-    action = action['action'] # possible actions: STOP, MOVE_FORWARD, TURN_LEFT, TURN_RIGHT
     
     if self.done_first_input:
       self._step += 1
@@ -285,23 +255,12 @@ class VLNEnv(embodied.Env):
     ob = self.format_obs(ob)
     if self._expert_ep:
       self.next_expert_ac = self.prev_env_ob['shortest_path_sensor'][0]
-      ob["next_expert_ac"] = self.next_expert_ac
-    else:
-      ob["next_expert_ac"] = -1
     self._done = (self._step >= self._length) or dones
-    ob['reward'] = rew
-    ob['is_first'] = False
-    ob['is_last'] = (self._step >= self._length) or self._done
-    ob['is_terminal'] = self._done
     ob["is_read_step"] = not self.done_first_input
-    ob["is_demo"] = self._expert_ep
     ob[f'log_{self._mode}_success'] = infos['success']
     ob[f'log_{self._mode}_pl_success'] = infos['spl']
     ob[f'log_{self._mode}_oracle_success'] = infos['oracle_success']
-    ob[f'log_image'] = self.render_with_text(ob, self.cur_text, log_traj_id, self._disc_act_space[action])
-    ob[f'log_language_info'] = self.cur_text
-
-    return ob
+    return ob, rew, self._done, None
 
   def embed_language(self, lang):
     if lang in self.cache:
@@ -382,7 +341,6 @@ class VLNEnv(embodied.Env):
     if self._use_text:
       if self._use_stored_tokens:
         self.cur_text = ob['instruction']['text']
-        new_ob['token_embeds_all'] = np.asarray(ob['instruction']['tokens'])
       else:
         new_ob.update(self.get_embed_text(ob))
     
