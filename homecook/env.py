@@ -26,7 +26,7 @@ class HomeCook(embodied.Env):
     lang_types=["task"],
   ):
     assert task in ("longcleanup")
-    assert language_obs in ("strings", "embeds", "token_embeds")
+    assert language_obs in ("strings", "embeds", "token_embeds", "sentence_embeds")
     from minigrid.homegridv2 import HomeCook
     from minigrid.homegridv2_wrappers import (
       PickupTask, LongEpCleanup, Preread, RepeatLast,
@@ -58,8 +58,9 @@ class HomeCook(embodied.Env):
                    p_unsafe=p_unsafe)
     env = RGBImgPartialObsWrapper(env)
     env = FilterObsWrapper(env, ["image"])
-    assert task == "longcleanup" and language_obs == "token_embeds"
-    if language_obs == "token_embeds":
+    self.language_obs = language_obs
+    assert task == "longcleanup" and language_obs in ("token_embeds", "sentence_embeds")
+    if language_obs in ["token_embeds", "sentence_embeds"]:
       env = MultitaskWrapper(env)
       env = LanguageWrapper(
         env,
@@ -67,6 +68,7 @@ class HomeCook(embodied.Env):
         repeat_task_every=repeat_task_every,
         p_language=p_language,
         lang_types=lang_types,
+        return_sentence_embed=language_obs == "sentence_embeds",
       )
     elif language_obs == "embeds":
       env = LongEpCleanup(
@@ -78,6 +80,9 @@ class HomeCook(embodied.Env):
     env = Gym26Wrapper(env)
     self._env = env
     self.observation_space = env.observation_space
+    if self.language_obs == "sentence_embeds":
+      del self.observation_space.spaces["token"]
+      del self.observation_space.spaces["token_embed"]
     self.action_space = self._env.action_space
     self.wrappers = [
       from_gym.FromGym,
@@ -88,12 +93,22 @@ class HomeCook(embodied.Env):
     obs = self._env.reset()
     del obs["log_language_info"]
     obs["token"] = np.array(obs["token"], dtype=np.uint32)
+    if self.language_obs == "sentence_embeds":
+      obs["sentence_embed"] = obs["sentence_embed"].astype(np.float32)
+      del obs["token"]
+      del obs["token_embed"]
+    t = {k: s.shape for k, s in obs.items()}
     return obs
 
   def step(self, action):
     obs, rew, done, info = self._env.step(action)
     del obs["log_language_info"]
     obs["token"] = np.array(obs["token"], dtype=np.uint32)
+    if self.language_obs == "sentence_embeds":
+      obs["sentence_embed"] = obs["sentence_embed"].astype(np.float32)
+      del obs["token"]
+      del obs["token_embed"]
+    t = {k: s.shape for k, s in obs.items()}
     return obs, rew, done, info
 
   def render(self):

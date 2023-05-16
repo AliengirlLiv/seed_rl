@@ -29,8 +29,7 @@ class Messenger(embodied.Env):
     assert task in ("s1", "s2", "s3")
     assert mode in ("train", "eval")
     assert language_obs in ("strings", "token_embeds",
-                            "token_embeds_all")
-    assert language_obs == "token_embeds", "currently only token_embeds supported"
+                            "token_embeds_all", "sentence_embeds")
     import messenger
     
     from messenger.envs.stage_one import StageOne
@@ -83,10 +82,14 @@ class Messenger(embodied.Env):
 
     self.language_obs = language_obs
     if load_embeddings:
-      with open(f"{os.path.dirname(__file__)}/data/messenger_embeds.pkl", "rb") as f:
+      if self.language_obs == "sentence_embeds":
+        fname = f"{os.path.dirname(__file__)}/data/messenger_sent_embeds.pkl"
+      else:
+        fname = f"{os.path.dirname(__file__)}/data/messenger_embeds.pkl"
+      with open(fname, "rb") as f:
         self.token_cache, self.embed_cache = pickle.load(f)
-      self.empty_token_id = self.token_cache["<pad>"]
-      self.empty_token_embed = self.embed_cache["<pad>"]
+      self.empty_token_id = self.token_cache["<pad>"] if self.token_cache else None
+      self.empty_embed = self.embed_cache["<pad>"]
     else:
       self._init_models()
 
@@ -113,7 +116,7 @@ class Messenger(embodied.Env):
       self.empty_token_id = self.tokenizer.pad_token_id
       from transformers import T5EncoderModel
       self.encoder = T5EncoderModel.from_pretrained("t5-small")
-      self.empty_token_embed = self._embed("<pad>")[0][0]
+      self.empty_embed = self._embed("<pad>")[0][0]
 
   def _symbolic_to_multihot(self, obs):
     # (h, w, 2)
@@ -133,21 +136,32 @@ class Messenger(embodied.Env):
         high=1,
         shape=(*self.grid_size, self.n_entities),
       ),
-      "token": spaces.Box(
-          0, 32100,
-          shape=(),
-          dtype=np.uint32),
-      "token_embed": spaces.Box(
-          -np.inf, np.inf,
-          shape=(512,),
-          dtype=np.float32),
       "is_read_step": spaces.Box(
         low=np.array(False),
         high=np.array(True),
         shape=(),
-        dtype=bool,
-      )
-      }
+        dtype=bool)
+    }
+    if self.language_obs == "token_embeds":
+      obs_space.update({
+        "token": spaces.Box(
+            0, 32100,
+            shape=(),
+            dtype=np.uint32),
+        "token_embed": spaces.Box(
+            -np.inf, np.inf,
+            shape=(512,),
+            dtype=np.float32)
+        })
+    elif self.language_obs == "sentence_embeds":
+      obs_space.update({
+        "sentence_embed": spaces.Box(
+          -np.inf, np.inf,
+          shape=(768,),
+          dtype=np.float32)
+      })
+    else:
+      raise NotImplementedError(self.language_obs)
     return obs_space
 
   @property
@@ -156,7 +170,11 @@ class Messenger(embodied.Env):
 
   def _embed(self, string):
     assert self.language_obs == "token_embeds" or \
-      self.language_obs == "token_embeds_all"
+      self.language_obs == "token_embeds_all" or \
+      self.language_obs == "sentence_embeds"
+    if self.language_obs == "sentence_embeds":
+      assert string in self.embed_cache, f"Not found: {string}"
+      return self.embed_cache[string]
     if f"{string}_{self.max_token_seqlen}" not in self.token_cache \
         or string not in self.embed_cache:
       pad_cfg = {} if self.language_obs != "token_embeds_all" else {
@@ -233,6 +251,14 @@ class Messenger(embodied.Env):
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
       })
       self.reading = True
+    elif self.language_obs == "sentence_embeds":
+      self.sentence_embeds = [
+        self._embed(sent) for sent in self.manual_sentences
+      ]
+      obs.update({
+        "sentence_embed": self.sentence_embeds[self.read_step],
+      })
+      self.reading = True
     self.read_step += 1
     obs["image"] = self._symbolic_to_multihot(obs)
     obs["is_read_step"] = self.reading
@@ -256,6 +282,10 @@ class Messenger(embodied.Env):
           "language_info_input_ids": self.full_manual_tokens["input_ids"],
           "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
         })
+      elif self.language_obs == "sentence_embeds":
+        obs.update({
+          "sentence_embed": self.sentence_embeds[self.read_step]
+        })
 
       else:
         raise NotImplementedError()
@@ -264,7 +294,12 @@ class Messenger(embodied.Env):
         if self.read_step >= 15:
           self.reading = False
           self.read_step = 0
-      elif self.read_step >= len(self.tokens):
+      elif self.language_obs == "sentence_embeds" and \
+        self.read_step >= len(self.sentence_embeds):
+        self.reading = False
+        self.read_step = 0
+      elif self.language_obs == "token_embeds" and \
+        self.read_step >= len(self.tokens):
         self.reading = False
         self.read_step = 0
       if 'info' in obs:
@@ -281,12 +316,16 @@ class Messenger(embodied.Env):
       obs["token"] = np.array(self.empty_token_id, dtype=np.uint32)
     elif self.language_obs == "token_embeds":
       obs["token"] = np.array(self.empty_token_id, dtype=np.uint32)
-      obs["token_embed"] = self.empty_token_embed
+      obs["token_embed"] = self.empty_embed
     elif self.language_obs == "token_embeds_all":
       obs.update({
         "token_embeds_all": self.token_embeds_all,
         "language_info_input_ids": self.full_manual_tokens["input_ids"],
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
+      })
+    elif self.language_obs == "sentence_embeds":	
+      obs.update({	
+        "sentence_embed": self.empty_embed	
       })
     obs["image"] = self._symbolic_to_multihot(obs)
     info.update({
@@ -346,6 +385,6 @@ class Messenger(embodied.Env):
     return new_img
 
 
-def create_environment(task, mode, length):
-    env = Messenger(task, mode, length=length)
+def create_environment(task, mode, length, language_obs):
+    env = Messenger(task, mode, length=length, language_obs=language_obs)
     return env

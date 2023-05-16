@@ -50,7 +50,7 @@ flags.DEFINE_list('value_sizes', None, 'Sizes of each of value MLP hidden layer.
 flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
 
@@ -65,7 +65,7 @@ def create_agent(env_observation_space, num_actions):
         cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
         cnn_strides=[int(stride) for stride in FLAGS.cnn_strides],
         cnn_kernels=[int(kernel) for kernel in FLAGS.cnn_kernels],
-        vocab_size=env_observation_space['token'].high + 1,
+        vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
@@ -88,6 +88,7 @@ def main(argv):
         task=FLAGS.task_name,
         mode='train',
         length=FLAGS.length,
+        language_obs='token_embeds' if FLAGS.lang_key in ['token_embed', 'token'] else 'sentence_embeds',
     )
     if FLAGS.run_mode == 'actor':
         actor.actor_loop(create_environment)

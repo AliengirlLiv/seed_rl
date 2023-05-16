@@ -58,7 +58,7 @@ flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
 flags.DEFINE_integer('preread_max', -1, 'Preread max.')
 flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 
@@ -72,7 +72,7 @@ def create_agent(env_observation_space, num_actions):
         cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
         cnn_strides=[int(stride) for stride in FLAGS.cnn_strides],
         cnn_kernels=[int(kernel) for kernel in FLAGS.cnn_kernels],
-        vocab_size=env_observation_space['token'].high + 1,
+        vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
@@ -102,7 +102,7 @@ def main(argv):
         p_teleport=FLAGS.p_teleport,
         p_unsafe=FLAGS.p_unsafe,
         # lang wrapper config
-        language_obs="token_embeds",
+        language_obs='token_embeds' if FLAGS.lang_key in ['token_embed', 'token'] else 'sentence_embeds',
         repeat_task_every=FLAGS.repeat_task_every,
         preread_max=FLAGS.preread_max,
         p_language=FLAGS.p_language,
