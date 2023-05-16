@@ -97,7 +97,6 @@ class HomeCook(embodied.Env):
       obs["sentence_embed"] = obs["sentence_embed"].astype(np.float32)
       del obs["token"]
       del obs["token_embed"]
-    t = {k: s.shape for k, s in obs.items()}
     return obs
 
   def step(self, action):
@@ -108,7 +107,6 @@ class HomeCook(embodied.Env):
       obs["sentence_embed"] = obs["sentence_embed"].astype(np.float32)
       del obs["token"]
       del obs["token_embed"]
-    t = {k: s.shape for k, s in obs.items()}
     return obs, rew, done, info
 
   def render(self):
