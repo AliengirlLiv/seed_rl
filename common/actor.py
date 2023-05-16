@@ -178,7 +178,12 @@ def actor_loop(create_env_fn, config=None, log_period=1):
           # from the terminal state to the resetted state in the next loop
           # iteration (with zero rewards).
           with timer_cls('actor/elapsed_env_reset_s', 10):
+            old_observation = observation
             observation = batched_env.reset_if_done(done)
+            # Logging should come from the old episode
+            for k, v in old_observation.items():
+              if k.startswith('log_'):
+                observation[k] = v
 
           if is_rendering_enabled and done[0]:
             batched_env.render()

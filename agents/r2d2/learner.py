@@ -721,9 +721,6 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
 
   total_frames = tf.Variable(0, dtype=tf.int64)
   total_non_reading_frames = tf.Variable(0, dtype=tf.int64)
-  log_train_success = tf.Variable(0, dtype=tf.float64)
-  log_train_pl_success = tf.Variable(0, dtype=tf.float64)
-  log_train_oracle_success = tf.Variable(0, dtype=tf.float64)
   server = grpc2.Server([FLAGS.server_address])
 
   # Buffer of incomplete unrolls. Filled during inference with new transitions.
@@ -816,9 +813,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     total_frames.assign_add(FLAGS.inference_batch_size)
     reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
     total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
-    log_train_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
-    log_train_pl_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_pl_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
-    log_train_oracle_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_oracle_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
+    log_train_success = tf.cast(env_outputs.observation.get('log_train_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)
+    log_train_pl_success = tf.cast(env_outputs.observation.get('log_train_pl_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)
+    log_train_oracle_success = tf.cast(env_outputs.observation.get('log_train_oracle_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)
     store.reset(tf.gather(
         envs_needing_reset,
         tf.where(is_training_env(envs_needing_reset))[:, 0]))
