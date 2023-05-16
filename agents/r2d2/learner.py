@@ -114,7 +114,7 @@ EpisodeInfo = collections.namedtuple(
     # returns: Sum of undiscounted rewards experienced in the episode.
     # raw_returns: Sum of raw rewards experienced in the episode.
     # env_ids: ID of the environment that generated this episode.
-    'num_frames returns raw_returns non_reading, total_frames, env_ids')
+    'num_frames returns raw_returns log_train_success log_train_pl_success log_train_oracle_success non_reading, total_frames, env_ids')
 
 
 def get_replay_insertion_batch_size(per_replica=False):
@@ -721,6 +721,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
 
   total_frames = tf.Variable(0, dtype=tf.int64)
   total_non_reading_frames = tf.Variable(0, dtype=tf.int64)
+  log_train_success = tf.Variable(0, dtype=tf.int64)
+  log_train_pl_success = tf.Variable(0, dtype=tf.int64)
+  log_train_oracle_success = tf.Variable(0, dtype=tf.int64)
   server = grpc2.Server([FLAGS.server_address])
 
   # Buffer of incomplete unrolls. Filled during inference with new transitions.
@@ -735,6 +738,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       tf.TensorSpec([], tf.int64, 'episode_num_frames'),
       tf.TensorSpec([], tf.float32, 'episode_returns'),
       tf.TensorSpec([], tf.float32, 'episode_raw_returns'),
+      tf.TensorSpec([], tf.int64, 'episode_log_train_success'),
+      tf.TensorSpec([], tf.int64, 'episode_log_train_pl_success'),
+      tf.TensorSpec([], tf.int64, 'episode_log_train_oracle_success'),
       tf.TensorSpec([], tf.int64, 'total_non_reading_frames'),
       tf.TensorSpec([], tf.int64, 'total_frames'),
   )
@@ -810,6 +816,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     total_frames.assign_add(FLAGS.inference_batch_size)
     reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
     total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
+    log_train_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
+    log_train_pl_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_pl_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
+    log_train_oracle_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_oracle_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
     store.reset(tf.gather(
         envs_needing_reset,
         tf.where(is_training_env(envs_needing_reset))[:, 0]))
@@ -824,12 +833,17 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         'Abandoned done states are not supported in R2D2.')
 
     # Update steps and return.
-    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, 0, 0))
+    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, 0, 0, 0, 0, 0))
     done_ids = tf.gather(env_ids, tf.where(env_outputs.done)[:, 0])
     done_episodes_info = env_infos.read(done_ids)
     info_queue.enqueue_many(EpisodeInfo(*(done_episodes_info + (done_ids,))))
     env_infos.reset(done_ids)
-    env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0., total_non_reading_frames * tf.cast(env_outputs.done, tf.int64), total_frames * tf.cast(env_outputs.done, tf.int64)))
+    env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0.,
+                            log_train_success * tf.cast(env_outputs.done, tf.int64),
+                            log_train_pl_success * tf.cast(env_outputs.done, tf.int64),
+                            log_train_oracle_success * tf.cast(env_outputs.done, tf.int64),
+                            total_non_reading_frames * tf.cast(env_outputs.done, tf.int64),
+                            total_frames * tf.cast(env_outputs.done, tf.int64)))
 
     # Inference.
     prev_actions = actions.read(env_ids)
@@ -940,7 +954,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         summary_writer.set_as_default()
         tf.summary.experimental.set_step(num_env_frames)
         episode_info = info_queue.dequeue_many(info_queue.size())
-        for n, r, _, non_reading, total_frames, env_id in zip(*episode_info):
+        for n, r, _, log_train_success, log_train_pl_success, log_train_oracle_success, non_reading, total_frames, env_id in zip(*episode_info):
           is_training = is_training_env(env_id)
           logging.info(
               'Return: %f Frames: %i, Non reading: %i, Total frames: %i, Env id: %i (%s) Iteration: %i',
@@ -949,6 +963,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
               iterations.numpy())
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_return", r)
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/episode_frames", n)
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/train_success", tf.reduce_mean(log_train_success))
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/train_pl_success", tf.reduce_mean(log_train_pl_success))
+          tf.summary.scalar(f"{'training' if is_training else 'eval'}/train_oracle_success", tf.reduce_mean(log_train_oracle_success))
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/total_frames", tf.reduce_max(total_frames))
           tf.summary.scalar(f"{'training' if is_training else 'eval'}/non_reading_frames", tf.reduce_max(non_reading))
       log_future.result()  # Raise exception if any occurred in logging.

@@ -145,7 +145,9 @@ class VLNEnv(embodied.Env):
         else:
           raise NotImplementedError(self.language_obs)
 
-
+    new_space[f'log_{self._mode}_success'] = spaces.Box(dtype=np.int64, shape=(), low=np.zeros(shape=(), dtype=np.int64), high=np.ones(shape=(), dtype=np.int64))
+    new_space[f'log_{self._mode}_pl_success'] = spaces.Box(dtype=np.int64, shape=(), low=np.zeros(shape=(), dtype=np.int64), high=np.ones(shape=(), dtype=np.int64))
+    new_space[f'log_{self._mode}_oracle_success'] = spaces.Box(dtype=np.int64, shape=(), low=np.zeros(shape=(), dtype=np.int64), high=np.ones(shape=(), dtype=np.int64))
     return new_space
   @property
   def action_space(self):
@@ -220,9 +222,9 @@ class VLNEnv(embodied.Env):
 
     ob = self.format_obs(ob)
     ob["is_read_step"] = not self.done_first_input
-    ob[f'log_{self._mode}_success'] = 0
-    ob[f'log_{self._mode}_pl_success'] = 0
-    ob[f'log_{self._mode}_oracle_success'] = 0
+    ob[f'log_{self._mode}_success'] = np.array(0, dtype=np.int64)
+    ob[f'log_{self._mode}_pl_success'] = np.array(0, dtype=np.int64)
+    ob[f'log_{self._mode}_oracle_success'] = np.array(0, dtype=np.int64)
 
     if self._expert_ep:
       # need to get infos to get gt_actions
@@ -250,16 +252,14 @@ class VLNEnv(embodied.Env):
       dones = False
       infos = {'success': 0, 'spl': 0, 'oracle_success': 0}
 
-    
-    log_traj_id = ob['instruction']['trajectory_id']
     ob = self.format_obs(ob)
     if self._expert_ep:
       self.next_expert_ac = self.prev_env_ob['shortest_path_sensor'][0]
     self._done = (self._step >= self._length) or dones
     ob["is_read_step"] = not self.done_first_input
-    ob[f'log_{self._mode}_success'] = infos['success']
-    ob[f'log_{self._mode}_pl_success'] = infos['spl']
-    ob[f'log_{self._mode}_oracle_success'] = infos['oracle_success']
+    ob[f'log_{self._mode}_success'] = np.array(infos['success'], dtype=np.int64)
+    ob[f'log_{self._mode}_pl_success'] = np.array(infos['spl'], dtype=np.int64)
+    ob[f'log_{self._mode}_oracle_success'] = np.array(infos['oracle_success'], dtype=np.int64)
     return ob, rew, self._done, None
 
   def embed_language(self, lang):
