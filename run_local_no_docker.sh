@@ -52,7 +52,7 @@ fi
 LEARNER_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=${GPU} python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=learner --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 NUM_ENVS=$(($NUM_ACTORS*$ENV_BATCH_SIZE))
-CONDA_COMMAND="conda activate embodiedvln"
+CONDA_COMMAND="echo 'hi'" #conda activate embodied"
 SESSION="L${EXPID}"
 
 tmux new-session -d -s $SESSION
@@ -80,7 +80,7 @@ tmux send-keys -t "learner" "$CONDA_COMMAND && $COMMAND" ENTER
 
 echo "NUM_ACTORS: ${NUM_ACTORS}"
 for ((id=0; id<$NUM_ACTORS; id++)); do
-    ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=$id python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
+    ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES='' python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
     tmux new-window -d -n "actor_${id}"
     COMMAND=''"${ACTOR_BINARY}"' --logtostderr --pdb_post_mortem '"$args"' --num_envs='"${NUM_ENVS}"' --task='"${id}"' --env_batch_size='"${ENV_BATCH_SIZE}"''
     tmux send-keys -t "actor_${id}" "$CONDA_COMMAND && $COMMAND" ENTER
