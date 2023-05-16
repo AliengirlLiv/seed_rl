@@ -54,7 +54,7 @@ flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Langua
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 flags.DEFINE_string('dataset', 'train_parsed_ns_all_mips_all', 'Dataset.')
-flags.DEFINE_bool('use_descriptions', True, 'Use descriptions.')
+flags.DEFINE_integer('use_descriptions', 1, 'Use descriptions.')
 flags.DEFINE_bool('use_depth', True, 'Use depth.')
 flags.DEFINE_bool('use_stored_tokens', False, 'Use stored tokens.')
 flags.DEFINE_integer('size', 64, 'Size.')
@@ -98,7 +98,7 @@ def main(argv):
     def create_environment(task, config): return env.create_environment(
         dataset=FLAGS.dataset,
         language_obs='token_embeds',
-        use_descriptions=FLAGS.use_descriptions,
+        use_descriptions=int(FLAGS.use_descriptions),
         mode=FLAGS.mode,
         use_depth=FLAGS.use_depth,
         use_stored_tokens=FLAGS.use_stored_tokens,
