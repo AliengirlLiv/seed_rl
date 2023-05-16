@@ -721,9 +721,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
 
   total_frames = tf.Variable(0, dtype=tf.int64)
   total_non_reading_frames = tf.Variable(0, dtype=tf.int64)
-  log_train_success = tf.Variable(0, dtype=tf.int64)
-  log_train_pl_success = tf.Variable(0, dtype=tf.int64)
-  log_train_oracle_success = tf.Variable(0, dtype=tf.int64)
+  log_train_success = tf.Variable(0, dtype=tf.float64)
+  log_train_pl_success = tf.Variable(0, dtype=tf.float64)
+  log_train_oracle_success = tf.Variable(0, dtype=tf.float64)
   server = grpc2.Server([FLAGS.server_address])
 
   # Buffer of incomplete unrolls. Filled during inference with new transitions.
@@ -738,9 +738,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       tf.TensorSpec([], tf.int64, 'episode_num_frames'),
       tf.TensorSpec([], tf.float32, 'episode_returns'),
       tf.TensorSpec([], tf.float32, 'episode_raw_returns'),
-      tf.TensorSpec([], tf.int64, 'episode_log_train_success'),
-      tf.TensorSpec([], tf.int64, 'episode_log_train_pl_success'),
-      tf.TensorSpec([], tf.int64, 'episode_log_train_oracle_success'),
+      tf.TensorSpec([], tf.float64, 'episode_log_train_success'),
+      tf.TensorSpec([], tf.float64, 'episode_log_train_pl_success'),
+      tf.TensorSpec([], tf.float64, 'episode_log_train_oracle_success'),
       tf.TensorSpec([], tf.int64, 'total_non_reading_frames'),
       tf.TensorSpec([], tf.int64, 'total_frames'),
   )
@@ -816,9 +816,9 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     total_frames.assign_add(FLAGS.inference_batch_size)
     reading = env_outputs.observation.get('is_read_step', tf.zeros_like(env_outputs.reward, dtype=tf.bool))
     total_non_reading_frames.assign_add(tf.reduce_sum(1 - tf.cast(reading, tf.int64)))
-    log_train_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
-    log_train_pl_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_pl_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
-    log_train_oracle_success.assign_add(tf.reduce_sum(env_outputs.observation.get('log_train_oracle_success', tf.zeros_like(env_outputs.reward, dtype=tf.int64))))
+    log_train_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
+    log_train_pl_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_pl_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
+    log_train_oracle_success.assign_add(tf.reduce_sum(tf.cast(env_outputs.observation.get('log_train_oracle_success', -1 * tf.ones_like(env_outputs.reward, dtype=tf.int64)), dtype=tf.float64)))
     store.reset(tf.gather(
         envs_needing_reset,
         tf.where(is_training_env(envs_needing_reset))[:, 0]))
@@ -833,15 +833,13 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
         'Abandoned done states are not supported in R2D2.')
 
     # Update steps and return.
-    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, 0, 0, 0, 0, 0))
+    env_infos.add(env_ids, (0, env_outputs.reward, raw_rewards, log_train_success, log_train_pl_success, log_train_oracle_success, 0, 0))
     done_ids = tf.gather(env_ids, tf.where(env_outputs.done)[:, 0])
     done_episodes_info = env_infos.read(done_ids)
     info_queue.enqueue_many(EpisodeInfo(*(done_episodes_info + (done_ids,))))
     env_infos.reset(done_ids)
     env_infos.add(env_ids, (FLAGS.num_action_repeats, 0., 0.,
-                            log_train_success * tf.cast(env_outputs.done, tf.int64),
-                            log_train_pl_success * tf.cast(env_outputs.done, tf.int64),
-                            log_train_oracle_success * tf.cast(env_outputs.done, tf.int64),
+                            0, 0, 0,
                             total_non_reading_frames * tf.cast(env_outputs.done, tf.int64),
                             total_frames * tf.cast(env_outputs.done, tf.int64)))
 
