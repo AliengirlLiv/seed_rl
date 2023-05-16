@@ -38,10 +38,18 @@ fi
 export CONFIG=$ENVIRONMENT
 
 export WANDB_API_KEY=$1
-export GPU=$2
+export GPU_LIST=$2
+# SPlit GPU list into a list of GPUs
+IFS=',' read -ra GPU_ARRAY <<< "$GPU_LIST"
+echo "GPU_ARRAY: ${GPU_ARRAY[@]}"
 export EXPID=$3
-shift 3
+export ENVS_PER_ACTOR=$4
+shift 4
 args="$@"
+# Last GPU goes to the learner
+GPU=${GPU_ARRAY[-1]}
+echo "GPU for learner: ${GPU}"
+GPU_ARRAY=("${GPU_ARRAY[@]:0:${#GPU_ARRAY[@]}-1}")
 
 source ~/miniconda3/etc/profile.d/conda.sh || echo "conda apparently wasn't where we thought it was"
 
@@ -80,7 +88,8 @@ tmux send-keys -t "learner" "$CONDA_COMMAND && $COMMAND" ENTER
 
 echo "NUM_ACTORS: ${NUM_ACTORS}"
 for ((id=0; id<$NUM_ACTORS; id++)); do
-    ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=$id python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
+    ACTOR_GPU=${GPU_ARRAY[$id % ${#GPU_ARRAY[@]}]}
+    ACTOR_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=$ACTOR_GPU python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=actor --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
     tmux new-window -d -n "actor_${id}"
     COMMAND=''"${ACTOR_BINARY}"' --logtostderr --pdb_post_mortem '"$args"' --num_envs='"${NUM_ENVS}"' --task='"${id}"' --env_batch_size='"${ENV_BATCH_SIZE}"''
     tmux send-keys -t "actor_${id}" "$CONDA_COMMAND && $COMMAND" ENTER
