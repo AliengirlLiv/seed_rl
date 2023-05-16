@@ -43,7 +43,7 @@ export EXPID=$3
 shift 3
 args="$@"
 
-source ~/miniconda3/etc/profile.d/conda.sh
+source ~/miniconda3/etc/profile.d/conda.sh || echo "conda apparently wasn't where we thought it was"
 
 if [[ "$ENVIRONMENT" == "messenger" ]]; then
     export ENVIRONMENT="messenger_env"
@@ -52,7 +52,7 @@ fi
 LEARNER_BINARY="WANDB_API_KEY=${WANDB_API_KEY} CUDA_VISIBLE_DEVICES=${GPU} python3 seed_rl/${ENVIRONMENT}/${AGENT}_main.py --run_mode=learner --exp_name=L${EXPID} --logdir ../logs/L${EXPID}";
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 NUM_ENVS=$(($NUM_ACTORS*$ENV_BATCH_SIZE))
-CONDA_COMMAND="echo 'hi'" #conda activate embodied"
+CONDA_COMMAND="conda activate $CONDA_DEFAULT_ENV || echo 'Failed to activate conda environment'"
 SESSION="L${EXPID}"
 
 tmux new-session -d -s $SESSION
