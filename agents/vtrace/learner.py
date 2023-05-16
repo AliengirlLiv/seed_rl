@@ -346,7 +346,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
                         FLAGS.init_checkpoint)
       if len(possible_files) > 1:
         # Choose the most recent checkpoint.
-        checkpoint_path = max(possible_files, key=os.path.getctime)
+        checkpoint_path = max([p + '.index' for p in possible_files], key=os.path.getctime)
         tf.print('Found multiple checkpoint files, choosing %s' %
                   checkpoint_path)
       checkpoint_path = possible_files[0]
