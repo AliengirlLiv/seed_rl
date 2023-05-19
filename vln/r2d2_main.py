@@ -47,14 +47,14 @@ flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 flags.DEFINE_list('policy_sizes', None, 'Sizes of each of policy MLP hidden layer.')
 flags.DEFINE_list('value_sizes', None, 'Sizes of each of value MLP hidden layer.')
 
-flags.DEFINE_integer('stack_size', 1, 'Number of frames to stack.')  # TODO: have we been using a stack this whole time???
+flags.DEFINE_integer('stack_size', 1, 'Number of frames to stack.')
 # Environment settings
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 flags.DEFINE_string('dataset', 'train_parsed_ns_all_mips_all', 'Dataset.')
-flags.DEFINE_bool('use_descriptions', True, 'Use descriptions.')
+flags.DEFINE_integer('use_descriptions', 1, 'Use descriptions.')
 flags.DEFINE_bool('use_depth', True, 'Use depth.')
 flags.DEFINE_bool('use_stored_tokens', False, 'Use stored tokens.')
 flags.DEFINE_integer('size', 64, 'Size.')
@@ -76,7 +76,7 @@ def create_agent(env_observation_space, num_actions):
         cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
         cnn_strides=[int(stride) for stride in FLAGS.cnn_strides],
         cnn_kernels=[int(kernel) for kernel in FLAGS.cnn_kernels],
-        vocab_size=env_observation_space['token'].high + 1,
+        vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
@@ -97,8 +97,8 @@ def main(argv):
     random.seed(FLAGS.seed)
     def create_environment(task, config): return env.create_environment(
         dataset=FLAGS.dataset,
-        language_obs='token_embeds',
-        use_descriptions=FLAGS.use_descriptions,
+        language_obs='token_embeds' if FLAGS.lang_key in ['token_embed', 'token'] else 'sentence_embeds',
+        use_descriptions=int(FLAGS.use_descriptions),
         mode=FLAGS.mode,
         use_depth=FLAGS.use_depth,
         use_stored_tokens=FLAGS.use_stored_tokens,

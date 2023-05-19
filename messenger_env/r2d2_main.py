@@ -47,7 +47,7 @@ flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 flags.DEFINE_list('policy_sizes', None, 'Sizes of each of policy MLP hidden layer.')
 flags.DEFINE_list('value_sizes', None, 'Sizes of each of value MLP hidden layer.')
 
-flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
+flags.DEFINE_integer('stack_size', 1, 'Number of frames to stack.')
 # Environment settings.
 flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')

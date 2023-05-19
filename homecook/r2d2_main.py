@@ -47,7 +47,7 @@ flags.DEFINE_integer('lstm_size', 128, 'Size of the LSTM layer.')
 flags.DEFINE_list('policy_sizes', None, 'Sizes of each of policy MLP hidden layer.')
 flags.DEFINE_list('value_sizes', None, 'Sizes of each of value MLP hidden layer.')
 
-flags.DEFINE_integer('stack_size', 4, 'Number of frames to stack.')
+flags.DEFINE_integer('stack_size', 1, 'Number of frames to stack.')
 # Environment settings.
 flags.DEFINE_integer('max_steps', 100, 'Number of steps per episode.')
 flags.DEFINE_integer('num_trashobjs', 2, 'Number of trash objects.')

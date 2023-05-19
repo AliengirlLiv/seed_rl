@@ -13,10 +13,7 @@
 # limitations under the License.
 
 
-"""VTrace (IMPALA) example for Mujoco.
-
-Warning!!! This code uses DeepMind wrappers which differ from OpenAI gym
-wrappers and the results may not be comparable.
+"""VTrace (IMPALA) example for Homecook.
 """
 
 import sys  # TODO: find another way to make this work!!
@@ -52,7 +49,7 @@ flags.DEFINE_integer('repeat_task_every', 20, 'Repeat task every')
 flags.DEFINE_integer('preread_max', -1, 'Preread max.')
 flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
-flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'none'], 'Language key.')
+flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 
 
@@ -65,7 +62,7 @@ def create_agent(action_space, env_observation_space,
                              lstm_size=FLAGS.lstm_size,
                              mlp_sizes=[int(size) for size in FLAGS.mlp_sizes],
                              cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
-                             vocab_size=env_observation_space['token'].high + 1,
+                             vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
                              lang_key=FLAGS.lang_key,
                              policy_sizes=[int(size) for size in FLAGS.policy_sizes],
                              value_sizes=[int(size) for size in FLAGS.value_sizes],
