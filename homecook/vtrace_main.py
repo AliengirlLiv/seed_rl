@@ -89,7 +89,7 @@ def main(argv):
     p_teleport=FLAGS.p_teleport,
     p_unsafe=FLAGS.p_unsafe,
     # lang wrapper config
-    language_obs="token_embeds",
+    language_obs='token_embeds' if FLAGS.lang_key in ['token_embed', 'token'] else 'sentence_embeds',
     repeat_task_every=FLAGS.repeat_task_every,
     preread_max=FLAGS.preread_max,
     p_language=FLAGS.p_language,
