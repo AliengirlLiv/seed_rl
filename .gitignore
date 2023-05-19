@@ -1,2 +1,4 @@
 *.pyc
 *.pkl
+VLN_CE/
+*zip
