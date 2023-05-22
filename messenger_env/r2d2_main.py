@@ -53,6 +53,8 @@ flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
+flags.DEFINE_list('aux_sizes', [256], 'Sizes of each of aux MLP hidden layer.')
+flags.DEFINE_list('aux_heads', ['reward', 'done', 'lang', 'next_lang', 'image', 'next_image'], 'Auxiliary prediction heads.')
 
 
 
@@ -65,10 +67,12 @@ def create_agent(env_observation_space, num_actions):
         cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
         cnn_strides=[int(stride) for stride in FLAGS.cnn_strides],
         cnn_kernels=[int(kernel) for kernel in FLAGS.cnn_kernels],
-        vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
+        vocab_size=env_observation_space[FLAGS.lang_key].high + 1 if FLAGS.lang_key == 'token' else env_observation_space[FLAGS.lang_key].shape[0],
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
+        aux_pred_sizes=[int(size) for size in FLAGS.aux_sizes],
+        aux_pred_heads=FLAGS.aux_heads,
         )
 
 

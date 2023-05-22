@@ -20,7 +20,6 @@ from seed_rl.common import utils
 import tensorflow as tf
 import numpy as np
 
-AgentOutput = collections.namedtuple('AgentOutput', 'action q_values')
 AgentState = collections.namedtuple(
     # core_state: the opaque state of the recurrent core of the agent.
     # frame_stacking_state: a list of the last (stack_size - 1) observations
@@ -232,12 +231,16 @@ class DuelingLSTMDQNNet(tf.Module):
 
   def __init__(self, num_actions, observation_space, stack_size=1, lang_key='token',
                mlp_sizes=(64,), cnn_sizes=(16, 32, 32), cnn_strides=(4, 2, 1), cnn_kernels=(8, 4, 3), 
-               vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256, aux_pred_sizes=(256,),
-               aux_pred_heads=('reward', 'image', 'lang', 'next_image', 'next_lang', 'cont')):
+               vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256, 
+               aux_pred_sizes=(256,),
+               aux_pred_heads=('reward', 'done', 'lang', 'next_lang', 'image', 'next_image')
+               ):
     super(DuelingLSTMDQNNet, self).__init__(name='dueling_lstm_dqn_net')
     self._num_actions = num_actions
     self._uses_int_input = (observation_space['image'].high == 255).all()
     self._aux_pred_heads = aux_pred_heads
+    agent_output_names = ['action', 'q_values'] + list(aux_pred_heads)
+    self.AgentOutput = collections.namedtuple('AgentOutput', ' '.join(agent_output_names))
     layer_list = []
     assert len(cnn_sizes) == len(cnn_strides) == len(cnn_kernels)
     for size, stride, kernel in zip(cnn_sizes, cnn_strides, cnn_kernels):
@@ -287,7 +290,15 @@ class DuelingLSTMDQNNet(tf.Module):
           mlp_layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
           mlp_layers.append(tf.keras.layers.LayerNormalization())
       self._mlp = tf.keras.Sequential(mlp_layers)
-      
+
+    if len(aux_pred_heads) > 0:
+      layers = []
+      for i, size in enumerate(aux_pred_sizes):
+        layers.append(tf.keras.layers.Dense(size, None))
+        layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+        layers.append(tf.keras.layers.LayerNormalization())
+      self._aux_trunk = tf.keras.Sequential(layers)
+
     for pred_head in aux_pred_heads:
       if 'image' in pred_head: # Deconv
         if pred_head in ['image', 'next_image']:
@@ -305,7 +316,7 @@ class DuelingLSTMDQNNet(tf.Module):
         deconv_layers.append(tf.keras.layers.Reshape(observation_space['image'].shape))
         self.__setattr__('_pred_{}'.format(pred_head), tf.keras.Sequential(deconv_layers))
       else:  # MLP
-        if pred_head in ['reward', 'cont']:
+        if pred_head in ['reward', 'done']:
           final_size = 1
         elif pred_head in ['lang', 'next_lang']:
           final_size = vocab_size
@@ -365,12 +376,17 @@ class DuelingLSTMDQNNet(tf.Module):
     q_values = value + advantage
 
     action = tf.cast(tf.argmax(q_values, axis=1), tf.int32)
-    return AgentOutput(action, q_values)
+    aux_outputs = self._aux_head(core_output, action)
+    return self.AgentOutput(action, q_values, *aux_outputs)
 
-  def _pred_head(self, core_output):
-    aux_outputs = {}
+  def _aux_head(self, core_output, action):
+    if len(self._aux_pred_heads) == 0:
+      return []
+    input_ = tf.concat([core_output, tf.one_hot(action, self._num_actions)], axis=1)
+    trunk_output = self._aux_trunk(input_)
+    aux_outputs = []
     for pred_head in self._aux_pred_heads:
-      aux_outputs[pred_head] = self.__getattribute__('_pred_{}'.format(pred_head))(core_output)
+      aux_outputs.append(self.__getattribute__('_pred_{}'.format(pred_head))(trunk_output))
     return aux_outputs
 
   def __call__(self, input_, agent_state, unroll=False):
@@ -452,5 +468,4 @@ class DuelingLSTMDQNNet(tf.Module):
         self._core)
 
     agent_output = utils.batch_apply(self._head, (core_outputs,))
-    aux_output = utils.batch_apply(self._aux_head, (core_outputs,))
-    return agent_output, aux_output, AgentState(core_state, frame_state)
+    return agent_output, AgentState(core_state, frame_state)

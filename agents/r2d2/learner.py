@@ -91,6 +91,7 @@ flags.DEFINE_float('discounting', .997, 'Discounting factor.')
 flags.DEFINE_integer('use_wandb', 1, 'Whether to use wandb.')
 flags.DEFINE_string('env', 'homecook', 'Environment.')
 flags.DEFINE_string('exp_name', 'temp', 'Exp name, also used for wandb.')
+flags.DEFINE_float('aux_loss_weight', 1, 'Auxiliary loss weight.')
 
 
 # Eval settings
@@ -263,6 +264,7 @@ def n_step_bellman_target(rewards, done, q_target, gamma, n_steps):
 
 
 def compute_loss_and_priorities_from_agent_outputs(
+    logger,
     training_agent_output,
     target_agent_output,
     env_outputs,
@@ -330,14 +332,56 @@ def compute_loss_and_priorities_from_agent_outputs(
   # [batch_size]
   priorities = (eta * tf.reduce_max(abs_td_errors, axis=0) +
                 (1 - eta) * tf.reduce_mean(abs_td_errors, axis=0))
+  
+  # Predict reward, if available
+  loss_dict = {}
+  if hasattr(training_agent_output, 'reward'):
+    reward_pred = tf.squeeze(training_agent_output.reward, axis=-1)
+    loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_outputs.reward))
+  if hasattr(training_agent_output, 'done'):  # binary cross entropy loss
+    done_pred = tf.squeeze(training_agent_output.done, axis=-1)
+    loss_dict['done'] = tf.reduce_mean(
+      tf.keras.losses.binary_crossentropy(
+          env_outputs.done, done_pred, from_logits=True))
+  if hasattr(training_agent_output, 'lang'):
+    lang_pred = training_agent_output.lang
+    loss_dict['lang'] = tf.reduce_mean(tf.square(lang_pred - env_outputs.observation['token_embed']))
+  if hasattr(training_agent_output, 'next_lang'):
+    next_lang_pred = training_agent_output.next_lang
+    # Remove the last timestep, since we don't have a next language for it
+    next_lang_pred = next_lang_pred[:, :-1, :]
+    env_next_lang = env_outputs.observation['token_embed']
+    # Shift one timestep so we're predicting the next language
+    env_next_lang = env_next_lang[:, 1:, :]
+    loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
+  if hasattr(training_agent_output, 'image'):
+    image_pred = training_agent_output.image
+    loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - env_outputs.observation['image']))
+  if hasattr(training_agent_output, 'next_image'):
+    next_image_pred = training_agent_output.next_image
+    # Remove the last timestep, since we don't have a next image for it
+    next_image_pred = next_image_pred[:, :-1, :]
+    env_next_image = env_outputs.observation['image']
+    # Shift one timestep so we're predicting the next image
+    env_next_image = env_next_image[:, 1:, :]
+    loss_dict['next_image'] = tf.reduce_mean(tf.square(next_image_pred - env_next_image))
+  aux_loss = 0
+  session = logger.log_session()
+  for k, v in loss_dict.items():
+    aux_loss += v
+    logger.log(session, 'loss/pred_{}'.format(k), v)
 
   # Sums over time dimension.
-  loss = 0.5 * tf.reduce_sum(tf.math.square(abs_td_errors), axis=0)
+  rl_loss = 0.5 * tf.reduce_sum(tf.math.square(abs_td_errors), axis=0)
+  loss = rl_loss + aux_loss * FLAGS.aux_loss_weight
 
-  return loss, priorities
+  logger.log(session, 'loss/loss', loss)
+  logger.log(session, 'loss/aux_loss', aux_loss)
+  logger.log(session, 'loss/rl_loss', rl_loss)
+  return loss, priorities, session
 
 
-def compute_loss_and_priorities(
+def compute_loss_and_priorities(logger,
     training_agent, target_agent,
     agent_state, prev_actions, env_outputs, agent_outputs,
     gamma, burn_in):
@@ -386,7 +430,7 @@ def compute_loss_and_priorities(
   target_agent_output, _ = target_agent(
       agent_input_suffix, target_state, unroll=True)
   _, env_outputs_suffix = agent_input_suffix
-  return compute_loss_and_priorities_from_agent_outputs(
+  return compute_loss_and_priorities_from_agent_outputs(logger,
       training_agent_output, target_agent_output, env_outputs_suffix,
       agent_outputs_suffix, gamma)
 
@@ -576,7 +620,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     def create_target_agent_variables(*args):
       return target_agent(*decode(args))
 
-    # The first call to Keras models to create varibales for agent and target.
+    # The first call to Keras models to create variables for agent and target.
     initial_agent_output, _ = create_variables(input_, initial_agent_state)
     create_target_agent_variables(input_, initial_agent_state)
 
@@ -635,7 +679,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       with tf.GradientTape() as tape:
         # loss: [batch_size]
         # priorities: [batch_size]
-        loss, priorities = compute_loss_and_priorities(
+        loss, priorities, logs = compute_loss_and_priorities(
+            logger,
             agent,
             target_agent,
             args.unrolls.agent_state,
@@ -654,6 +699,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
       for t, g in zip(temp_grads, grads):
         t.assign(g)
 
+      logger.step_end(logs, training_strategy, iter_frame_ratio)
       return loss, priorities, args.indices, gradient_norm_before_clip
 
     loss, priorities, indices, gradient_norm_before_clip = (
@@ -683,6 +729,8 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
   # Logging.
   summary_writer = tf.summary.create_file_writer(
       FLAGS.logdir, flush_millis=20000, max_queue=1000)
+  logger = utils.ProgressLogger(summary_writer=summary_writer,
+                                starting_step=iterations * iter_frame_ratio)
 
   # Setup checkpointing and restore checkpoint.
   ckpt = tf.train.Checkpoint(
@@ -893,9 +941,10 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     _, env_outputs_suffix = utils.split_structure(
 
         utils.make_time_major(unrolled_env_outputs), FLAGS.burn_in)
-    _, initial_priorities = compute_loss_and_priorities_from_agent_outputs(
+    _, initial_priorities, _ = compute_loss_and_priorities_from_agent_outputs(
         # We don't use the outputs from a separated target network for computing
         # initial priorities.
+        logger,
         agent_outputs_suffix,
         agent_outputs_suffix,
         env_outputs_suffix,
@@ -990,6 +1039,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
                           max_gradient_norm_before_clip)
         max_gradient_norm_before_clip = 0.
 
+  logger.shutdown()
   manager.save()
   server.shutdown()
   unroll_queue.close()
