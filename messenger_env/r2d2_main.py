@@ -54,7 +54,7 @@ flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed'
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
 flags.DEFINE_list('aux_sizes', [256], 'Sizes of each of aux MLP hidden layer.')
-flags.DEFINE_list('aux_heads', ['reward', 'done', 'lang', 'next_lang', 'image', 'next_image'], 'Auxiliary prediction heads.')
+flags.DEFINE_list('aux_heads', [], 'Auxiliary prediction heads.')
 
 
 
