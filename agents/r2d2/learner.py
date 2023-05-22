@@ -335,9 +335,18 @@ def compute_loss_and_priorities_from_agent_outputs(
   
   # Predict reward, if available
   loss_dict = {}
+  session = logger.log_session()
   if hasattr(training_agent_output, 'reward'):
     reward_pred = tf.squeeze(training_agent_output.reward, axis=-1)
-    loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_outputs.reward))
+    # Remove the last one, which is dummy
+    reward_pred = reward_pred[:-1]
+    
+    # Remove the first env reward, which is dummy
+    env_reward = env_outputs.reward[1:]
+    # env_reward = env_outputs.reward
+    
+    loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_reward))
+    
   if hasattr(training_agent_output, 'done'):  # binary cross entropy loss
     done_pred = tf.squeeze(training_agent_output.done, axis=-1)
     loss_dict['done'] = tf.reduce_mean(
@@ -349,10 +358,10 @@ def compute_loss_and_priorities_from_agent_outputs(
   if hasattr(training_agent_output, 'next_lang'):
     next_lang_pred = training_agent_output.next_lang
     # Remove the last timestep, since we don't have a next language for it
-    next_lang_pred = next_lang_pred[:, :-1, :]
+    next_lang_pred = next_lang_pred[:-1]
     env_next_lang = env_outputs.observation['token_embed']
     # Shift one timestep so we're predicting the next language
-    env_next_lang = env_next_lang[:, 1:, :]
+    env_next_lang = env_next_lang[1:]
     loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
   if hasattr(training_agent_output, 'image'):
     image_pred = training_agent_output.image
@@ -360,13 +369,13 @@ def compute_loss_and_priorities_from_agent_outputs(
   if hasattr(training_agent_output, 'next_image'):
     next_image_pred = training_agent_output.next_image
     # Remove the last timestep, since we don't have a next image for it
-    next_image_pred = next_image_pred[:, :-1, :]
+    next_image_pred = next_image_pred[:-1]
     env_next_image = env_outputs.observation['image']
     # Shift one timestep so we're predicting the next image
-    env_next_image = env_next_image[:, 1:, :]
+    env_next_image = env_next_image[1:]
     loss_dict['next_image'] = tf.reduce_mean(tf.square(next_image_pred - env_next_image))
   aux_loss = 0
-  session = logger.log_session()
+  # session = logger.log_session()
   for k, v in loss_dict.items():
     aux_loss += v
     logger.log(session, 'loss/pred_{}'.format(k), v)
@@ -980,6 +989,11 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
     last_num_env_frames = iterations * iter_frame_ratio
     last_log_time = time.time()
     max_gradient_norm_before_clip = 0.
+    def additional_logs():
+      tf.summary.scalar('temp', 1)
+    
+
+    logger.start(additional_logs)
     while iterations < final_iteration:
       num_env_frames = iterations * iter_frame_ratio
       tf.summary.experimental.set_step(num_env_frames)
@@ -1039,7 +1053,7 @@ def learner_loop(create_env_fn, create_agent_fn, create_optimizer_fn):
                           max_gradient_norm_before_clip)
         max_gradient_norm_before_clip = 0.
 
-  logger.shutdown()
+  # logger.shutdown()
   manager.save()
   server.shutdown()
   unroll_queue.close()
