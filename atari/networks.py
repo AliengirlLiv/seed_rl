@@ -348,12 +348,12 @@ class DuelingLSTMDQNNet(tf.Module):
     if not self._use_lstm:
       return AgentState(tf.zeros([batch_size, 0], dtype=tf.float32),
                         frame_stacking_state=initial_frame_stacking_state(
-            self._stack_size, batch_size, self._observation_shape['image']))
+            self._stack_size, batch_size, self._observation_space['image']))
     return AgentState(
         core_state=self._core.get_initial_state(
             batch_size=batch_size, dtype=tf.float32),
         frame_stacking_state=initial_frame_stacking_state(
-            self._stack_size, batch_size, self._observation_shape['image']))
+            self._stack_size, batch_size, self._observation_space['image']))
 
   def _torso(self, prev_action, env_output):
     # [batch_size, output_units]
