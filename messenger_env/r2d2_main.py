@@ -74,6 +74,7 @@ def create_agent(env_observation_space, num_actions):
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
         aux_pred_sizes=[int(size) for size in FLAGS.aux_sizes],
         aux_pred_heads=FLAGS.aux_heads,
+        mlp_core_sizes=[int(size) for size in FLAGS.mlp_core_sizes] if FLAGS.mlp_core_sizes else None,
         )
 
 

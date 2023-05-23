@@ -60,7 +60,8 @@ def create_agent(action_space, env_observation_space,
                              lang_key=FLAGS.lang_key,
                              policy_sizes=[int(size) for size in FLAGS.policy_sizes],
                              value_sizes=[int(size) for size in FLAGS.value_sizes],
-                             obs_space=env_observation_space)
+                             obs_space=env_observation_space,
+                             mlp_core_sizes=[int(size) for size in FLAGS.mlp_core_sizes] if FLAGS.mlp_core_sizes else None)
 
 
 def create_optimizer(unused_final_iteration):

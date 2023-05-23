@@ -233,7 +233,8 @@ class DuelingLSTMDQNNet(tf.Module):
                mlp_sizes=(64,), cnn_sizes=(16, 32, 32), cnn_strides=(4, 2, 1), cnn_kernels=(8, 4, 3), 
                vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256, mlp_core_sizes=None,
                aux_pred_sizes=(256,),
-               aux_pred_heads=('reward', 'done', 'lang', 'next_lang', 'image', 'next_image')
+              #  aux_pred_heads=('reward', 'done', 'lang', 'next_lang', 'image', 'next_image')
+               aux_pred_heads=(),
                ):
     super(DuelingLSTMDQNNet, self).__init__(name='dueling_lstm_dqn_net')
     self._num_actions = num_actions
