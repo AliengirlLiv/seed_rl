@@ -231,12 +231,13 @@ class DuelingLSTMDQNNet(tf.Module):
 
   def __init__(self, num_actions, observation_space, stack_size=1, lang_key='token',
                mlp_sizes=(64,), cnn_sizes=(16, 32, 32), cnn_strides=(4, 2, 1), cnn_kernels=(8, 4, 3), 
-               vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256, 
+               vocab_size=32100, policy_sizes=None, value_sizes=None, lstm_size=256, mlp_core_sizes=None,
                aux_pred_sizes=(256,),
                aux_pred_heads=('reward', 'done', 'lang', 'next_lang', 'image', 'next_image')
                ):
     super(DuelingLSTMDQNNet, self).__init__(name='dueling_lstm_dqn_net')
     self._num_actions = num_actions
+    self._use_lstm = lstm_size > 0
     self._uses_int_input = (observation_space['image'].high == 255).all()
     self._aux_pred_heads = aux_pred_heads
     agent_output_names = ['action', 'q_values'] + list(aux_pred_heads)
@@ -279,7 +280,16 @@ class DuelingLSTMDQNNet(tf.Module):
       layer_list.append(tf.keras.layers.Dense(self._num_actions, name='advantage_head', use_bias=False))
       self._advantage = tf.keras.Sequential(layer_list)
     
-    self._core = tf.keras.layers.LSTMCell(lstm_size)
+    if self._use_lstm:
+      self._core = tf.keras.layers.LSTMCell(lstm_size)
+    else:
+      core_layers = []
+      for i, size in enumerate(mlp_core_sizes):
+        core_layers.append(tf.keras.layers.Dense(size, None))
+        if i < len(mlp_core_sizes) - 1:
+          core_layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
+          core_layers.append(tf.keras.layers.LayerNormalization())
+      self._core = tf.keras.Sequential(core_layers)
     self._lang_key = lang_key
     self._vocab_size = vocab_size
     if not lang_key == 'none':
@@ -334,11 +344,15 @@ class DuelingLSTMDQNNet(tf.Module):
     self._stack_size = stack_size
 
   def initial_state(self, batch_size):
+    if not self._use_lstm:
+      return AgentState(tf.zeros([batch_size, 0], dtype=tf.float32),
+                        frame_stacking_state=initial_frame_stacking_state(
+            self._stack_size, batch_size, self._observation_shape['image']))
     return AgentState(
         core_state=self._core.get_initial_state(
             batch_size=batch_size, dtype=tf.float32),
         frame_stacking_state=initial_frame_stacking_state(
-            self._stack_size, batch_size, self._observation_space['image'].shape))
+            self._stack_size, batch_size, self._observation_shape['image']))
 
   def _torso(self, prev_action, env_output):
     # [batch_size, output_units]
@@ -429,7 +443,7 @@ class DuelingLSTMDQNNet(tf.Module):
       print(f'Total number of parameters: {num_params}')
       if hasattr(self, '_embedding'):
         print(f'Number of embedding params: {sum([np.prod(v.shape) for v in self._embedding.trainable_variables])}')
-      print(f'Number of lstm params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
+      print(f'Number of {"lstm" if self._use_lstm else "mlp core"} params: {sum([np.prod(v.shape) for v in self._core.trainable_variables])}')
       if hasattr(self, '_mlp'):
         print(f'Number of mlp params: {sum([np.prod(v.shape) for v in self._mlp.trainable_variables])}')
       print(f'Number of cnn params: {sum([np.prod(v.shape) for v in self._body.trainable_variables])}')
@@ -459,13 +473,17 @@ class DuelingLSTMDQNNet(tf.Module):
       stacked_frames = stacked_frames / 255
     observation['image'] = stacked_frames
     env_outputs = env_outputs._replace(observation=observation)
+    core_state = agent_state.core_state
     # [time, batch_size, torso_output_size]
     torso_outputs = utils.batch_apply(self._torso, (prev_actions, env_outputs))
 
-    core_outputs, core_state = _unroll_cell(
-        torso_outputs, done, agent_state.core_state,
-        initial_agent_state.core_state,
-        self._core)
+    if not self._use_lstm:
+      core_outputs = utils.batch_apply(self._core, (torso_outputs,))
+    else:
+      core_outputs, core_state = _unroll_cell(
+          torso_outputs, done, agent_state.core_state,
+          initial_agent_state.core_state,
+          self._core)
 
     agent_output = utils.batch_apply(self._head, (core_outputs,))
     return agent_output, AgentState(core_state, frame_state)

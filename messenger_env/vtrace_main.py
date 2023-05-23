@@ -45,6 +45,7 @@ flags.DEFINE_string('task_name', 's1', 'Messenger level (s1, s2, or s3)')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
+flags.DEFINE_list('mlp_core_sizes', None, 'Sizes of each of value MLP (substitute for LSTM)')
 
 FLAGS = flags.FLAGS
 

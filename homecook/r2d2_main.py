@@ -60,6 +60,7 @@ flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
+flags.DEFINE_list('mlp_core_sizes', None, 'Sizes of each of value MLP (substitute for LSTM)')
 
 
 

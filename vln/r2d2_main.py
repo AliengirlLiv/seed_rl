@@ -64,6 +64,7 @@ flags.DEFINE_float('min_use_expert', 0., 'Min use expert.')
 flags.DEFINE_integer('anneal_expert_eps', 0, 'Anneal expert eps.')
 flags.DEFINE_float('success_reward', 1000, 'Success reward.')
 flags.DEFINE_float('early_stop_penalty', -10., 'Early stop penalty.')
+flags.DEFINE_list('mlp_core_sizes', None, 'Sizes of each of value MLP (substitute for LSTM)')
 
 
 

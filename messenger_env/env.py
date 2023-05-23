@@ -157,7 +157,7 @@ class Messenger(embodied.Env):
       obs_space.update({
         "sentence_embed": spaces.Box(
           -np.inf, np.inf,
-          shape=(768,),
+          shape=(768*3,),
           dtype=np.float32)
       })
     else:
@@ -230,7 +230,7 @@ class Messenger(embodied.Env):
         "token": np.array(self.tokens[self.read_step], dtype=np.uint32),
         "token_embed": self.token_embeds[self.read_step],
       })
-      self.reading = True
+      self.reading = False
     elif self.language_obs == "token_embeds_all":
       self.token_embeds_all = []
       self.tokens = []
@@ -250,15 +250,16 @@ class Messenger(embodied.Env):
         "language_info_input_ids": self.full_manual_tokens["input_ids"],
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
       })
-      self.reading = True
+      self.reading = False
     elif self.language_obs == "sentence_embeds":
       self.sentence_embeds = [
         self._embed(sent) for sent in self.manual_sentences
       ]
+      concat_embeds = np.concatenate(self.sentence_embeds, axis=0)
       obs.update({
-        "sentence_embed": self.sentence_embeds[self.read_step],
+        "sentence_embed": concat_embeds,
       })
-      self.reading = True
+      self.reading = False
     self.read_step += 1
     obs["image"] = self._symbolic_to_multihot(obs)
     obs["is_read_step"] = self.reading
@@ -283,8 +284,11 @@ class Messenger(embodied.Env):
           "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
         })
       elif self.language_obs == "sentence_embeds":
+        # Concatenate all sentence embeds
+        concat_embed = np.concatenate(self.sentence_embeds, axis=0)
+        
         obs.update({
-          "sentence_embed": self.sentence_embeds[self.read_step]
+          "sentence_embed": concat_embed
         })
 
       else:
@@ -323,10 +327,17 @@ class Messenger(embodied.Env):
         "language_info_input_ids": self.full_manual_tokens["input_ids"],
         "language_info_attention_mask": self.full_manual_tokens["attention_mask"],
       })
-    elif self.language_obs == "sentence_embeds":	
-      obs.update({	
-        "sentence_embed": self.empty_embed	
-      })
+    elif self.language_obs == "sentence_embeds":
+      # Concatenate all sentence embeds
+        concat_embed = np.concatenate(self.sentence_embeds, axis=0)
+        
+        obs.update({
+          "sentence_embed": concat_embed
+        })
+    # elif self.language_obs == "sentence_embeds":	
+    #   obs.update({	
+    #     "sentence_embed": self.empty_embed	
+    #   })
     obs["image"] = self._symbolic_to_multihot(obs)
     info.update({
       "entities": obs["entities"],

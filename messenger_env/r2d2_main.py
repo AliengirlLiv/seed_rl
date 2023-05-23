@@ -55,6 +55,7 @@ flags.DEFINE_integer('seed', 0, 'Random seed.')
 flags.DEFINE_integer('length', 64, 'Length of environment.')
 flags.DEFINE_list('aux_sizes', [256], 'Sizes of each of aux MLP hidden layer.')
 flags.DEFINE_list('aux_heads', [], 'Auxiliary prediction heads.')
+flags.DEFINE_list('mlp_core_sizes', None, 'Sizes of each of value MLP (substitute for LSTM)')
 
 
 
