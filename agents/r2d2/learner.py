@@ -392,6 +392,15 @@ def compute_loss_and_priorities_from_agent_outputs(
   
   # The action at timestep 0 should be used to predict the reward at timestep 1 and the done at timestep 1
   
+  lang_key = None
+  if 'token_embed' in env_outputs.observation:
+    lang_key = 'token_embed'
+  elif 'token' in env_outputs.observation:
+    lang_key = 'token'
+  elif 'sentence_embed' in env_outputs.observation:
+    lang_key = 'sentence_embed'
+  else:
+    raise ValueError('No language key found')
   
   if hasattr(training_agent_output, 'reward'):
     reward_pred = tf.squeeze(training_agent_output.reward, axis=-1)
@@ -411,15 +420,32 @@ def compute_loss_and_priorities_from_agent_outputs(
           env_done, done_pred, from_logits=True))
   if hasattr(training_agent_output, 'lang'):
     lang_pred = training_agent_output.lang
-    loss_dict['lang'] = tf.reduce_mean(tf.square(lang_pred - env_outputs.observation['token_embed']))
+    
+    # Use cross-entropy loss to classify what token was used
+    # Or use MSE to predict the embedding
+    if lang_key == 'token':
+      loss_dict['lang'] = tf.reduce_mean(
+        tf.keras.losses.sparse_categorical_crossentropy(
+            env_outputs.observation[lang_key], lang_pred, from_logits=True))
+    else:
+      loss_dict['lang'] = tf.reduce_mean(tf.square(lang_pred - env_outputs.observation[lang_key]))
+    
   if hasattr(training_agent_output, 'next_lang'):
     next_lang_pred = training_agent_output.next_lang
     # Remove the last timestep, since we don't have a next language for it
     next_lang_pred = next_lang_pred[:-1]
-    env_next_lang = env_outputs.observation['token_embed']
+    env_next_lang = env_outputs.observation[lang_key]
     # Shift one timestep so we're predicting the next language
     env_next_lang = env_next_lang[1:]
-    loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang) * (1 - tf.expand_dims(env_done, axis=-1)))
+    
+    # Use cross-entropy loss to classify what token was used
+    # Or use MSE to predict the embedding
+    if lang_key == 'token':
+      loss_dict['next_lang'] = tf.reduce_mean(
+        tf.keras.losses.sparse_categorical_crossentropy(
+            env_next_lang, next_lang_pred, from_logits=True))
+    else:
+      loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang) * (1 - tf.expand_dims(env_done, axis=-1)))
     # loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
   if hasattr(training_agent_output, 'image'):
     image_pred = training_agent_output.image

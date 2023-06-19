@@ -60,6 +60,8 @@ flags.DEFINE_float('p_language', 0.2, 'p_language')
 flags.DEFINE_list('lang_types', ['task'], 'Language types.')
 flags.DEFINE_enum('lang_key', 'token', ['token', 'token_embed', 'sentence_embed', 'none'], 'Language key.')
 flags.DEFINE_integer('seed', 0, 'Random seed.')
+flags.DEFINE_list('aux_sizes', [256], 'Sizes of each of aux MLP hidden layer.')
+flags.DEFINE_list('aux_heads', [], 'Auxiliary prediction heads.')
 
 
 
@@ -76,6 +78,8 @@ def create_agent(env_observation_space, num_actions):
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
+        aux_pred_sizes=[int(size) for size in FLAGS.aux_sizes],
+        aux_pred_heads=FLAGS.aux_heads,
         )
 
 
