@@ -74,7 +74,7 @@ def create_agent(env_observation_space, num_actions):
         cnn_sizes=[int(size) for size in FLAGS.cnn_sizes],
         cnn_strides=[int(stride) for stride in FLAGS.cnn_strides],
         cnn_kernels=[int(kernel) for kernel in FLAGS.cnn_kernels],
-        vocab_size=env_observation_space[FLAGS.lang_key].high + 1,
+        vocab_size=env_observation_space[FLAGS.lang_key].high + 1 if FLAGS.lang_key == 'token' else env_observation_space[FLAGS.lang_key].shape[0],
         lang_key=FLAGS.lang_key,
         policy_sizes=[int(size) for size in FLAGS.policy_sizes] if FLAGS.policy_sizes else None,
         value_sizes=[int(size) for size in FLAGS.value_sizes] if FLAGS.value_sizes else None,
