@@ -298,6 +298,7 @@ class DuelingLSTMDQNNet(tf.Module):
         layers.append(tf.keras.layers.Activation(tf.keras.activations.swish))
         layers.append(tf.keras.layers.LayerNormalization())
       self._aux_trunk = tf.keras.Sequential(layers)
+      self._action_embedding = tf.keras.layers.Embedding(num_actions, aux_pred_sizes[-1])
 
     for pred_head in aux_pred_heads:
       if 'image' in pred_head: # Deconv
@@ -382,7 +383,8 @@ class DuelingLSTMDQNNet(tf.Module):
   def _aux_head(self, core_output, action):
     if len(self._aux_pred_heads) == 0:
       return []
-    input_ = tf.concat([core_output, tf.one_hot(action, self._num_actions)], axis=1)
+    action_embedding = self._action_embedding(action)
+    input_ = tf.concat([core_output, action_embedding], axis=1)
     trunk_output = self._aux_trunk(input_)
     aux_outputs = []
     for pred_head in self._aux_pred_heads:

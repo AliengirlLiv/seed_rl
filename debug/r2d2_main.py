@@ -29,7 +29,7 @@ flags.DEFINE_list('aux_sizes', [256], 'Sizes of each of aux MLP hidden layer.')
 flags.DEFINE_list('aux_heads', ['reward', 'done', 'lang', 'next_lang', 'image', 'next_image'], 'Auxiliary prediction heads.')
 flags.DEFINE_enum('obs_mode', 'random', ['random', 'deterministic', 'action'], 'Obs mode')
 flags.DEFINE_enum('done_mode', 'random', ['random', 'deterministic', 'action'], 'Done mode')
-flags.DEFINE_enum('reward_mode', 'random', ['random', 'deterministic', 'action'], 'Reward mode')
+flags.DEFINE_enum('reward_mode', 'random', ['random', 'deterministic', 'action', 'obs'], 'Reward mode')
 
 
 

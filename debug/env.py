@@ -1,6 +1,7 @@
 from seed_rl import embodied
 import numpy as np
 from gym import spaces
+import random
 
 class DebugEnv(embodied.Env):
 
@@ -76,7 +77,6 @@ class DebugEnv(embodied.Env):
     token = np.array(0, dtype=np.int64)
     token_embed = np.zeros((512,), dtype=np.float32)
     if self._obs_mode == 'random':
-        import random
         image = image + random.choice([0, 1])
         token = token + random.choice([0, 1])
         token_embed = token_embed + random.choice([0, 1])
@@ -99,10 +99,13 @@ class DebugEnv(embodied.Env):
         rew = [0, 1].index(self._step % 2)
     elif self._reward_mode == 'action':
         rew = action
+    elif self._reward_mode == 'obs':
+        min_obs = min(obs['image'].flatten())
+        rew = min_obs
     if self._done_mode == 'random':
         done = random.choice([True, False])
     elif self._done_mode == 'deterministic':
-        done = self._step == 10
+        done = self._step == 20
     elif self._done_mode == 'action':
         done = action == 1
     

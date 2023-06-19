@@ -336,22 +336,79 @@ def compute_loss_and_priorities_from_agent_outputs(
   # Predict reward, if available
   loss_dict = {}
   session = logger.log_session()
+  # Keep track of done so we don't predict across episode boundaries
+  env_done = tf.cast(env_outputs.done, tf.float32)[1:]
+  
+  # check that the reward and done match
+  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward, tf.cast(env_outputs.done, tf.float32)), tf.float32))
+  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[:-1], tf.cast(env_outputs.done[1:], tf.float32)), tf.float32))
+  reverse_shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[1:], tf.cast(env_outputs.done[:-1], tf.float32)), tf.float32))
+  logger.log(session, 'rew_done_aligned_matches', aligned_matches)  # PERFECT
+  logger.log(session, 'rew_done_shifted_matches', shifted_matches)
+  logger.log(session, 'rew_done_reverse_shifted_matches', reverse_shifted_matches)
+  # check that the action and done match
+  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.done, tf.int32)), tf.float32))
+  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.done[1:], tf.int32)), tf.float32))
+  reverse_shifted_matches = tf.reduce_mean(
+                              tf.cast(
+                                tf.equal(agent_outputs.action[1:], 
+                                         tf.cast(env_outputs.done[:-1], tf.int32)
+                                        )
+                              , tf.float32
+                            ))
+  logger.log(session, 'act_done_aligned_matches', aligned_matches)
+  logger.log(session, 'act_done_shifted_matches', shifted_matches) # PERFECT
+  logger.log(session, 'act_done_reverse_shifted_matches', reverse_shifted_matches)
+  # check that the action and reward match
+  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.reward, tf.int32)), tf.float32))
+  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.reward[1:], tf.int32)), tf.float32))
+  reverse_shifted_matches = tf.reduce_mean(
+                              tf.cast(
+                                tf.equal(agent_outputs.action[1:], 
+                                         tf.cast(env_outputs.reward[:-1], tf.int32)
+                                        )
+                              , tf.float32
+                            ))
+  logger.log(session, 'act_rew_aligned_matches', aligned_matches)
+  logger.log(session, 'act_rew_shifted_matches', shifted_matches)
+  logger.log(session, 'act_rew_reverse_shifted_matches', reverse_shifted_matches)
+  # Check that the observation and reward match
+  obs = env_outputs.observation['image']
+  # Take the mean over height and width and channels
+  obs = tf.reduce_mean(obs, axis=[-1, -2, -3])
+  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(obs, tf.cast(env_outputs.reward, tf.float32)), tf.float32))
+  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(obs[:-1], tf.cast(env_outputs.reward[1:], tf.float32)), tf.float32))
+  reverse_shifted_matches = tf.reduce_mean(
+                              tf.cast(
+                                tf.equal(obs[1:], 
+                                         tf.cast(env_outputs.reward[:-1], tf.float32)
+                                        )
+                              , tf.float32
+                            ))
+  logger.log(session, 'obs_rew_aligned_matches', aligned_matches) # 90% PERFECT
+  logger.log(session, 'obs_rew_shifted_matches', shifted_matches)
+  logger.log(session, 'obs_rew_reverse_shifted_matches', reverse_shifted_matches)
+  
+  
+  # The action at timestep 0 should be used to predict the reward at timestep 1 and the done at timestep 1
+  
+  
   if hasattr(training_agent_output, 'reward'):
     reward_pred = tf.squeeze(training_agent_output.reward, axis=-1)
     # Remove the last one, which is dummy
     reward_pred = reward_pred[:-1]
-    
     # Remove the first env reward, which is dummy
     env_reward = env_outputs.reward[1:]
-    # env_reward = env_outputs.reward
-    
-    loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_reward))
-    
+    # loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_reward))
+    loss_dict['reward'] = tf.reduce_mean(tf.square(reward_pred - env_reward)) * (1 - env_done)
+  # if hasattr(training_agent_output, 'action'):
+  #   action_pred = training_agent_output.action
+  #   loss_dict['action'] = tf.reduce_mean(tf.square(action_pred - tf.cast(env_outputs.action, tf.float32)))
   if hasattr(training_agent_output, 'done'):  # binary cross entropy loss
-    done_pred = tf.squeeze(training_agent_output.done, axis=-1)
+    done_pred = tf.squeeze(training_agent_output.done, axis=-1)[:-1]
     loss_dict['done'] = tf.reduce_mean(
       tf.keras.losses.binary_crossentropy(
-          env_outputs.done, done_pred, from_logits=True))
+          env_done, done_pred, from_logits=True))
   if hasattr(training_agent_output, 'lang'):
     lang_pred = training_agent_output.lang
     loss_dict['lang'] = tf.reduce_mean(tf.square(lang_pred - env_outputs.observation['token_embed']))
@@ -362,7 +419,8 @@ def compute_loss_and_priorities_from_agent_outputs(
     env_next_lang = env_outputs.observation['token_embed']
     # Shift one timestep so we're predicting the next language
     env_next_lang = env_next_lang[1:]
-    loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
+    loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang) * (1 - tf.expand_dims(env_done, axis=-1)))
+    # loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
   if hasattr(training_agent_output, 'image'):
     image_pred = training_agent_output.image
     loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - env_outputs.observation['image']))
@@ -373,6 +431,7 @@ def compute_loss_and_priorities_from_agent_outputs(
     env_next_image = env_outputs.observation['image']
     # Shift one timestep so we're predicting the next image
     env_next_image = env_next_image[1:]
+    # loss_dict['next_image'] = tf.reduce_mean(tf.square(next_image_pred - env_next_image) * (1 - env_done))
     loss_dict['next_image'] = tf.reduce_mean(tf.square(next_image_pred - env_next_image))
   aux_loss = 0
   # session = logger.log_session()
