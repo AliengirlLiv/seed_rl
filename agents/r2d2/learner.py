@@ -339,68 +339,69 @@ def compute_loss_and_priorities_from_agent_outputs(
   # Keep track of done so we don't predict across episode boundaries
   env_done = tf.cast(env_outputs.done, tf.float32)[1:]
   
-  # check that the reward and done match
-  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward, tf.cast(env_outputs.done, tf.float32)), tf.float32))
-  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[:-1], tf.cast(env_outputs.done[1:], tf.float32)), tf.float32))
-  reverse_shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[1:], tf.cast(env_outputs.done[:-1], tf.float32)), tf.float32))
-  logger.log(session, 'rew_done_aligned_matches', aligned_matches)  # PERFECT
-  logger.log(session, 'rew_done_shifted_matches', shifted_matches)
-  logger.log(session, 'rew_done_reverse_shifted_matches', reverse_shifted_matches)
-  # check that the action and done match
-  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.done, tf.int32)), tf.float32))
-  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.done[1:], tf.int32)), tf.float32))
-  reverse_shifted_matches = tf.reduce_mean(
-                              tf.cast(
-                                tf.equal(agent_outputs.action[1:], 
-                                         tf.cast(env_outputs.done[:-1], tf.int32)
-                                        )
-                              , tf.float32
-                            ))
-  logger.log(session, 'act_done_aligned_matches', aligned_matches)
-  logger.log(session, 'act_done_shifted_matches', shifted_matches) # PERFECT
-  logger.log(session, 'act_done_reverse_shifted_matches', reverse_shifted_matches)
-  # check that the action and reward match
-  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.reward, tf.int32)), tf.float32))
-  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.reward[1:], tf.int32)), tf.float32))
-  reverse_shifted_matches = tf.reduce_mean(
-                              tf.cast(
-                                tf.equal(agent_outputs.action[1:], 
-                                         tf.cast(env_outputs.reward[:-1], tf.int32)
-                                        )
-                              , tf.float32
-                            ))
-  logger.log(session, 'act_rew_aligned_matches', aligned_matches)
-  logger.log(session, 'act_rew_shifted_matches', shifted_matches)
-  logger.log(session, 'act_rew_reverse_shifted_matches', reverse_shifted_matches)
-  # Check that the observation and reward match
-  obs = env_outputs.observation['image']
-  # Take the mean over height and width and channels
-  obs = tf.reduce_mean(obs, axis=[-1, -2, -3])
-  aligned_matches = tf.reduce_mean(tf.cast(tf.equal(obs, tf.cast(env_outputs.reward, tf.float32)), tf.float32))
-  shifted_matches = tf.reduce_mean(tf.cast(tf.equal(obs[:-1], tf.cast(env_outputs.reward[1:], tf.float32)), tf.float32))
-  reverse_shifted_matches = tf.reduce_mean(
-                              tf.cast(
-                                tf.equal(obs[1:], 
-                                         tf.cast(env_outputs.reward[:-1], tf.float32)
-                                        )
-                              , tf.float32
-                            ))
-  logger.log(session, 'obs_rew_aligned_matches', aligned_matches) # 90% PERFECT
-  logger.log(session, 'obs_rew_shifted_matches', shifted_matches)
-  logger.log(session, 'obs_rew_reverse_shifted_matches', reverse_shifted_matches)
+  # TODO(olivia): delete this later! It's just for debugging, for use with the "debug" env
+  # # check that the reward and done match
+  # aligned_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward, tf.cast(env_outputs.done, tf.float32)), tf.float32))
+  # shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[:-1], tf.cast(env_outputs.done[1:], tf.float32)), tf.float32))
+  # reverse_shifted_matches = tf.reduce_mean(tf.cast(tf.equal(env_outputs.reward[1:], tf.cast(env_outputs.done[:-1], tf.float32)), tf.float32))
+  # logger.log(session, 'rew_done_aligned_matches', aligned_matches)  # PERFECT
+  # logger.log(session, 'rew_done_shifted_matches', shifted_matches)
+  # logger.log(session, 'rew_done_reverse_shifted_matches', reverse_shifted_matches)
+  # # check that the action and done match
+  # aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.done, tf.int32)), tf.float32))
+  # shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.done[1:], tf.int32)), tf.float32))
+  # reverse_shifted_matches = tf.reduce_mean(
+  #                             tf.cast(
+  #                               tf.equal(agent_outputs.action[1:], 
+  #                                        tf.cast(env_outputs.done[:-1], tf.int32)
+  #                                       )
+  #                             , tf.float32
+  #                           ))
+  # logger.log(session, 'act_done_aligned_matches', aligned_matches)
+  # logger.log(session, 'act_done_shifted_matches', shifted_matches) # PERFECT
+  # logger.log(session, 'act_done_reverse_shifted_matches', reverse_shifted_matches)
+  # # check that the action and reward match
+  # aligned_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action, tf.cast(env_outputs.reward, tf.int32)), tf.float32))
+  # shifted_matches = tf.reduce_mean(tf.cast(tf.equal(agent_outputs.action[:-1], tf.cast(env_outputs.reward[1:], tf.int32)), tf.float32))
+  # reverse_shifted_matches = tf.reduce_mean(
+  #                             tf.cast(
+  #                               tf.equal(agent_outputs.action[1:], 
+  #                                        tf.cast(env_outputs.reward[:-1], tf.int32)
+  #                                       )
+  #                             , tf.float32
+  #                           ))
+  # logger.log(session, 'act_rew_aligned_matches', aligned_matches)
+  # logger.log(session, 'act_rew_shifted_matches', shifted_matches)
+  # logger.log(session, 'act_rew_reverse_shifted_matches', reverse_shifted_matches)
+  # # Check that the observation and reward match
+  # obs = env_outputs.observation['image']
+  # # Take the mean over height and width and channels
+  # obs = tf.reduce_mean(obs, axis=[-1, -2, -3])
+  # aligned_matches = tf.reduce_mean(tf.cast(tf.equal(obs, tf.cast(env_outputs.reward, tf.float32)), tf.float32))
+  # shifted_matches = tf.reduce_mean(tf.cast(tf.equal(obs[:-1], tf.cast(env_outputs.reward[1:], tf.float32)), tf.float32))
+  # reverse_shifted_matches = tf.reduce_mean(
+  #                             tf.cast(
+  #                               tf.equal(obs[1:], 
+  #                                        tf.cast(env_outputs.reward[:-1], tf.float32)
+  #                                       )
+  #                             , tf.float32
+  #                           ))
+  # logger.log(session, 'obs_rew_aligned_matches', aligned_matches) # 90% PERFECT
+  # logger.log(session, 'obs_rew_shifted_matches', shifted_matches)
+  # logger.log(session, 'obs_rew_reverse_shifted_matches', reverse_shifted_matches)
   
   
   # The action at timestep 0 should be used to predict the reward at timestep 1 and the done at timestep 1
   
-  lang_key = None
-  if 'token_embed' in env_outputs.observation:
-    lang_key = 'token_embed'
-  elif 'token' in env_outputs.observation:
-    lang_key = 'token'
-  elif 'sentence_embed' in env_outputs.observation:
-    lang_key = 'sentence_embed'
-  else:
-    raise ValueError('No language key found')
+  lang_key = FLAGS.lang_key
+  # if 'token_embed' in env_outputs.observation:
+  #   lang_key = 'token_embed'
+  # elif 'token' in env_outputs.observation:
+  #   lang_key = 'token'
+  # elif 'sentence_embed' in env_outputs.observation:
+  #   lang_key = 'sentence_embed'
+  # else:
+  #   raise ValueError('No language key found')
   
   if hasattr(training_agent_output, 'reward'):
     reward_pred = tf.squeeze(training_agent_output.reward, axis=-1)
@@ -449,7 +450,7 @@ def compute_loss_and_priorities_from_agent_outputs(
     # loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
   if hasattr(training_agent_output, 'image'):
     image_pred = training_agent_output.image
-    loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - env_outputs.observation['image']))
+    loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - tf.cast(env_outputs.observation['image'], tf.float32)))
   if hasattr(training_agent_output, 'next_image'):
     next_image_pred = training_agent_output.next_image
     # Remove the last timestep, since we don't have a next image for it
