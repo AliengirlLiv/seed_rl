@@ -450,7 +450,13 @@ def compute_loss_and_priorities_from_agent_outputs(
     # loss_dict['next_lang'] = tf.reduce_mean(tf.square(next_lang_pred - env_next_lang))
   if hasattr(training_agent_output, 'image'):
     image_pred = training_agent_output.image
-    loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - tf.cast(env_outputs.observation['image'], tf.float32)))
+    # If the input observation is an int, then it's in the range [0-255].
+    # Switch it to [0-1]
+    env_image = tf.cast(env_outputs.observation['image'], tf.float32)
+    if env_image == tf.uint8:
+      env_image = env_image / 255.
+    
+    loss_dict['image'] = tf.reduce_mean(tf.square(image_pred - env_image))
   if hasattr(training_agent_output, 'next_image'):
     next_image_pred = training_agent_output.next_image
     # Remove the last timestep, since we don't have a next image for it
